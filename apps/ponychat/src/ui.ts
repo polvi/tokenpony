@@ -21,6 +21,7 @@ const shell = (title: string, body: string, script = '') => `<!doctype html>
   * { box-sizing:border-box; margin:0; }
   html,body { height:100%; }
   body {
+    height:100dvh;
     background:var(--bg); color:var(--text); display:flex; flex-direction:column;
     font-family:var(--font); font-size:1rem; line-height:1.55;
   }

@@ -38,7 +38,7 @@ export function page(title: string, body: string): string {
   .muted { color:var(--muted); font-size:.92rem; }
   .mono { font-family:var(--mono); }
   .eyebrow { font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--red); }
-  table { border-collapse:collapse; width:100%; font-size:.92rem; margin-top:.75rem; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; margin-top:.75rem; display:block; overflow-x:auto; }
   th,td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--rule); vertical-align:top; }
   th { font-family:var(--mono); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
   form.inline { display:inline; }
@@ -56,7 +56,8 @@ export function page(title: string, body: string): string {
   .card { background:var(--card); border:1.5px solid var(--ink); border-radius:6px; padding:1.25rem; margin-block:1rem; }
   .stat { font-family:var(--display); font-size:2.4rem; }
   .reveal { background:var(--panel); border:1.5px dashed var(--red); padding:1rem; border-radius:6px; font-family:var(--mono); word-break:break-all; }
-  code { font-family:var(--mono); background:var(--panel); padding:.1em .3em; border-radius:3px; font-size:.9em; }
+  code { font-family:var(--mono); background:var(--panel); padding:.1em .3em; border-radius:3px; font-size:.9em; overflow-wrap:anywhere; }
+  .mono { overflow-wrap:anywhere; }
   a { color:var(--blue); }
   .row { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; }
 </style>
