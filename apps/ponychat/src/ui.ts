@@ -1,6 +1,9 @@
 const esc = (s: string) =>
   s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
+// Pony Chat is the demo THIRD-PARTY app, so it deliberately looks nothing
+// like tokenpony: dark, rounded, lime-accented indie chat UI instead of the
+// provider's ivory airmail identity.
 const shell = (title: string, body: string, script = '') => `<!doctype html>
 <html lang="en">
 <head>
@@ -9,79 +12,100 @@ const shell = (title: string, body: string, script = '') => `<!doctype html>
 <title>${esc(title)}</title>
 <style>
   :root {
-    --paper:#fbf8f0; --panel:#f3eee1; --card:#fff; --ink:#1d2233; --muted:#5c6072;
-    --blue:#26409a; --blue-deep:#1b2f73; --red:#ce3b2c; --rule:#dad3c2;
-    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,monospace;
-    --display:'Iowan Old Style',Georgia,serif;
+    --bg:#0e1013; --surface:#171a21; --surface2:#20242e; --border:#2a2f3a;
+    --text:#e9eaf0; --dim:#8f95a3; --accent:#b6f36b; --accent-ink:#101505;
+    --radius:16px;
+    --font:'SF Pro Rounded',ui-rounded,'Nunito','Segoe UI',system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   * { box-sizing:border-box; margin:0; }
   html,body { height:100%; }
   body {
-    background:var(--paper); color:var(--ink); display:flex; flex-direction:column;
-    font-family:'Public Sans','Helvetica Neue',system-ui,sans-serif; font-size:1rem; line-height:1.55;
+    background:var(--bg); color:var(--text); display:flex; flex-direction:column;
+    font-family:var(--font); font-size:1rem; line-height:1.55;
   }
-  .hatch { flex:none; height:10px; background:repeating-linear-gradient(-45deg,var(--red) 0 14px,var(--paper) 14px 26px,var(--blue) 26px 40px,var(--paper) 40px 52px); }
-  header.bar { flex:none; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; padding:.8rem clamp(1rem,3vw,2rem); border-bottom:1px solid var(--rule); }
-  .wordmark { font-family:var(--display); font-weight:700; font-size:1.3rem; text-decoration:none; color:var(--ink); }
-  .wordmark small { font-family:var(--mono); font-size:.65rem; color:var(--red); letter-spacing:.12em; margin-left:.4rem; }
-  .muted { color:var(--muted); font-size:.85rem; }
+  header.bar {
+    flex:none; display:flex; justify-content:space-between; align-items:center; gap:1rem;
+    flex-wrap:wrap; padding:.85rem clamp(1rem,3vw,2rem);
+    background:var(--surface); border-bottom:1px solid var(--border);
+  }
+  .wordmark { font-weight:800; font-size:1.25rem; letter-spacing:-.02em; color:var(--text); text-decoration:none; }
+  .wordmark b { color:var(--accent); }
+  .tag {
+    font-size:.68rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--dim); border:1px solid var(--border); border-radius:999px; padding:.15rem .6rem; margin-left:.5rem;
+  }
+  .muted { color:var(--dim); font-size:.85rem; }
   .mono { font-family:var(--mono); }
-  main { flex:1; display:flex; flex-direction:column; max-width:52rem; width:100%; margin-inline:auto; padding:1rem clamp(1rem,3vw,2rem); min-height:0; }
+  main { flex:1; display:flex; flex-direction:column; max-width:50rem; width:100%; margin-inline:auto; padding:1rem clamp(1rem,3vw,2rem); min-height:0; }
   button, .btn {
-    font:inherit; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block;
-    padding:.55rem 1.1rem; border-radius:4px; border:2px solid var(--blue-deep);
-    background:var(--blue); color:var(--paper); box-shadow:2px 2px 0 var(--blue-deep);
+    font:inherit; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block;
+    padding:.65rem 1.3rem; border-radius:999px; border:none;
+    background:var(--accent); color:var(--accent-ink);
   }
-  button:hover { translate:1px 1px; box-shadow:1px 1px 0 var(--blue-deep); }
-  button.quiet { background:transparent; color:var(--ink); border-color:var(--ink); box-shadow:none; font-weight:500; padding:.35rem .7rem; font-size:.85rem; }
-  input, select { font:inherit; padding:.55rem .7rem; border:1.5px solid var(--ink); border-radius:4px; background:var(--card); }
-  a { color:var(--blue); }
+  button:hover, .btn:hover { filter:brightness(1.08); }
+  button.quiet, .quiet {
+    background:var(--surface2); color:var(--text); font-weight:500; font-size:.85rem;
+    padding:.4rem .9rem; border:1px solid var(--border);
+  }
+  input, select {
+    font:inherit; padding:.65rem .85rem; border:1px solid var(--border); border-radius:12px;
+    background:var(--surface2); color:var(--text); max-width:100%;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  a { color:var(--accent); }
+  .provider-chip {
+    display:inline-flex; align-items:center; gap:.4rem; font-size:.75rem; color:var(--dim);
+    border:1px solid var(--border); border-radius:999px; padding:.2rem .7rem; text-decoration:none;
+  }
+  .provider-chip:hover { color:var(--text); }
   ${body.includes('id="log"') ? chatCss : connectCss}
 </style>
 </head>
 <body>
-<div class="hatch"></div>
 ${body}
 ${script ? `<script>${script}</script>` : ''}
 </body>
 </html>`;
 
 const connectCss = `
-  .connect { margin:auto; max-width:34rem; width:100%; }
-  h1 { font-family:var(--display); font-size:clamp(1.9rem,5vw,2.6rem); line-height:1.15; margin-bottom:.75rem; }
-  .card { background:var(--card); border:1.5px solid var(--ink); border-radius:6px; padding:1.5rem; margin-top:1.5rem; }
-  .field { margin-block:.9rem; display:flex; flex-direction:column; gap:.3rem; }
-  label { font-family:var(--mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
-  .eyebrow { font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--red); }
+  .connect { margin:auto; max-width:33rem; width:100%; padding-block:2rem; }
+  h1 { font-size:clamp(1.8rem,5vw,2.5rem); font-weight:800; letter-spacing:-.02em; line-height:1.15; margin-bottom:.75rem; }
+  h1 em { font-style:normal; color:var(--accent); }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; margin-top:1.5rem; }
+  .field { margin-block:.9rem; display:flex; flex-direction:column; gap:.35rem; }
+  label { font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+  .err { color:#ff8a7a; font-weight:600; margin-top:.75rem; }
 `;
 
 const chatCss = `
-  #log { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.9rem; padding-block:1rem; min-height:0; }
-  .msg { max-width:85%; padding:.7rem 1rem; border-radius:6px; white-space:pre-wrap; overflow-wrap:break-word; }
-  .msg.user { align-self:flex-end; background:var(--blue); color:var(--paper); border:1.5px solid var(--blue-deep); }
-  .msg.assistant { align-self:flex-start; background:var(--card); border:1.5px solid var(--rule); }
-  .msg.error { align-self:center; background:#fbeae8; border:1.5px dashed var(--red); color:var(--red); font-size:.9rem; }
-  form#composer { flex:none; display:flex; gap:.6rem; padding-block:.75rem 1.25rem; }
-  #prompt { flex:1; }
-  .meter { font-family:var(--mono); font-size:.75rem; color:var(--muted); }
-  .meter b { color:var(--red); font-weight:600; }
+  #log { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.8rem; padding-block:1.1rem; min-height:0; }
+  .msg { max-width:85%; padding:.75rem 1.05rem; border-radius:var(--radius); white-space:pre-wrap; overflow-wrap:break-word; }
+  .msg.user { align-self:flex-end; background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:6px; font-weight:500; }
+  .msg.assistant { align-self:flex-start; background:var(--surface2); border:1px solid var(--border); border-bottom-left-radius:6px; }
+  .msg.error { align-self:center; background:#2a1714; border:1px solid #5c2a22; color:#ff9c8d; font-size:.9rem; border-radius:12px; }
+  form#composer { flex:none; display:flex; gap:.6rem; padding-block:.8rem 1.3rem; }
+  #prompt { flex:1; border-radius:999px; padding-inline:1.1rem; }
+  .meter { font-family:var(--mono); font-size:.72rem; color:var(--dim); }
+  .meter b { color:var(--accent); font-weight:700; }
+  .bar-right { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 `;
 
 export function connectPage(defaultIssuer: string, error?: string): string {
   return shell(
     'Pony Chat: bring your own tokens',
     `<header class="bar">
-  <span class="wordmark">Pony Chat<small>TPX DEMO</small></span>
+  <span class="wordmark">pony<b>chat</b><span class="tag">third-party demo</span></span>
   <span class="muted">an LLM app with <strong>zero</strong> API keys</span>
 </header>
 <main>
   <div class="connect">
-    <p class="eyebrow">Token Pony Express</p>
-    <h1>This app has no API keys. Bring your own tokens.</h1>
-    <p class="muted">Pony Chat ships with no LLM credentials and no inference bill. Connect a
-    token provider you pay: it asks for a metered budget, you approve it with a passkey,
-    and every completion is metered against that grant. Revoke it any time at your provider.</p>
-    ${error ? `<p style="color:var(--red)"><strong>${esc(error)}</strong></p>` : ''}
+    <h1>This app has <em>no API keys</em>. Bring your own tokens.</h1>
+    <p class="muted">Pony Chat is a third-party app built on the Token Pony Express protocol.
+    It ships with no LLM credentials and no inference bill. Connect a token provider you pay:
+    it asks for a metered credit budget, you approve it with a passkey, and every completion
+    is metered against that grant. Revoke it any time at your provider.</p>
+    ${error ? `<p class="err">${esc(error)}</p>` : ''}
     <form class="card" method="post" action="/connect">
       <div class="field">
         <label for="issuer">Token provider (any TPX issuer)</label>
@@ -97,7 +121,8 @@ export function connectPage(defaultIssuer: string, error?: string): string {
       </div>
       <button type="submit">Connect provider →</button>
     </form>
-    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and start with free demo credits.</p>
+    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and start with free demo credits.
+    Already connected before? Check your balance at <a href="${esc(defaultIssuer)}/dashboard">your provider's dashboard</a>.</p>
   </div>
 </main>`,
   );
@@ -107,9 +132,10 @@ export function chatPage(issuer: string, budget: number): string {
   return shell(
     'Pony Chat',
     `<header class="bar">
-  <span class="wordmark">Pony Chat<small>TPX DEMO</small></span>
-  <span class="meter">grant <b id="used">0</b> / ${budget.toLocaleString('en-US')} credits · <span class="mono">${esc(new URL(issuer).host)}</span></span>
-  <span>
+  <span class="wordmark">pony<b>chat</b><span class="tag">third-party demo</span></span>
+  <span class="meter">grant <b id="used">0</b> / ${budget.toLocaleString('en-US')} credits</span>
+  <span class="bar-right">
+    <a class="provider-chip" href="${esc(issuer)}/dashboard" target="_blank" rel="noopener">tokens by ${esc(new URL(issuer).host)} · manage balance ↗</a>
     <select id="model" class="quiet"></select>
     <form method="post" action="/disconnect" style="display:inline"><button class="quiet">Disconnect</button></form>
   </span>
