@@ -14,9 +14,11 @@ revocable, and pseudonymous (they carry no user identity).
 ## Units
 
 All balances and budgets are CREDITS: 1 credit = US$0.000001 (so "$X per M tokens" equals
-exactly X credits per token). Users buy credits at the dashboard via Stripe; packs start at
-$1 = 1,000,000 credits. There are no free credits. Per-model prices (USD per M input /
-cached input / output tokens) are published live on the models endpoint.
+exactly X credits per token). Users buy credits at the dashboard via Stripe at face value
+($1 = 1,000,000 credits); checkout adds card fees at cost, and after a user's first top-up
+each purchase also adds postage: the price of one US Forever stamp (currently $0.82). There
+are no free credits. Per-model prices (USD per M input / cached input / output tokens) are
+published live on the models endpoint.
 
 ## Integrating an app (the TPX flow)
 

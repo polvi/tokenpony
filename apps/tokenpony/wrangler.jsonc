@@ -19,6 +19,7 @@
   ],
   "vars": {
     "AI_GATEWAY_ID": "tokenpony",
+    "POSTAGE_CENTS": "82",
     "ISSUER": "https://api.tokenpony.dev",
     "AUTHGRAVITY_URL": "https://authgravity.tokenpony.dev",
     "WWW_URL": "https://tokenpony.dev"

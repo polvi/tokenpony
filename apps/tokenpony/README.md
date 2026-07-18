@@ -61,3 +61,14 @@ isolate, `src/pricing.ts`), with static fallbacks for models the catalog doesn't
 Gateway Unified Billing, which needs prepaid credits on the account. Re-add it to
 `src/models.ts` after purchasing credits. The Kimi lineup is currently served by
 `@cf/moonshotai/kimi-k2.7-code` under normal Workers AI billing.
+
+## Business model (postage)
+
+Credits sell at face value. Every checkout passes Stripe's standard card fees
+(2.9% + 30 cents) through at cost via `grossForNet()` in `src/billing.ts`, so no
+purchase can net less than the credits' face value. A user's **first** top-up is
+charged exactly at cost; every later top-up nets one US Forever stamp of margin
+("postage", the `POSTAGE_CENTS` var, $0.82 since 2026-07-12). Update the var when
+USPS changes the rate. Caveat: international cards cost Stripe more (+1.5%); the
+pass-through uses domestic rates, so foreign-card top-ups can dip slightly below
+cost.

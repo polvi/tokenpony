@@ -3,7 +3,7 @@ import { esc, page } from './html';
 import { randomToken, sha256Hex } from './util';
 import { applicationTuples, checkPermission, writeTuples } from './authz';
 import { requireSession } from './auth';
-import { PACKS } from './billing';
+import { PACKS, checkoutAmountCents, hasPaidBefore, postageCents } from './billing';
 import { usd } from './pricing';
 import type { AppEnv } from './types';
 
@@ -45,16 +45,22 @@ dashboard.get('/', async (c) => {
   const stripeReady = Boolean(c.env.STRIPE_SECRET_KEY);
   const paid = c.req.query('paid');
 
+  const first = !(await hasPaidBefore(c.env.DB, user.id));
+  const stampUsd = (postageCents(c.env) / 100).toFixed(2);
+  const feeNote = first
+    ? `Your first top-up is at cost: you pay only the card fees. After that, each top-up adds postage, the price of one US Forever stamp (currently $${stampUsd}).`
+    : `Each top-up passes card fees through at cost and adds postage: one US Forever stamp, currently $${stampUsd}.`;
   const billing = stripeReady
     ? `<div class="row">${Object.entries(PACKS)
-        .map(
-          ([id, p]) =>
-            `<form method="post" action="/billing/checkout" class="inline">
+        .map(([id, p]) => {
+          const total = (checkoutAmountCents(p.usd, first, postageCents(c.env)) / 100).toFixed(2);
+          return `<form method="post" action="/billing/checkout" class="inline">
                <input type="hidden" name="pack" value="${id}">
-               <button type="submit">Buy ${fmt(p.credits)} credits for $${p.usd}</button>
-             </form>`,
-        )
-        .join('')}</div>`
+               <button type="submit">Buy ${fmt(p.credits)} credits · $${total}</button>
+             </form>`;
+        })
+        .join('')}</div>
+<p class="muted">${feeNote}</p>`
     : `<p class="muted">Top-ups aren't configured yet (Stripe keys pending).</p>`;
 
   const keyRows =

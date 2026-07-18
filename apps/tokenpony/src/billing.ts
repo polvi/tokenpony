@@ -3,12 +3,47 @@ import { jsonError } from './util';
 import { requireSession } from './auth';
 import type { AppEnv } from './types';
 
-// Credits are micro-USD: the $5 pack is at par, the $20 pack carries a bonus.
+// Credits sell at face value: $1 buys 1,000,000 credits' worth of inference.
 export const PACKS: Record<string, { usd: number; credits: number }> = {
   demo: { usd: 1, credits: 1_000_000 },
   saddlebag: { usd: 5, credits: 5_000_000 },
-  wagon: { usd: 20, credits: 25_000_000 },
+  wagon: { usd: 20, credits: 20_000_000 },
 };
+
+// Stripe's standard US card pricing. We pass it through at cost on every
+// purchase so a top-up can never lose money.
+const STRIPE_PCT = 0.029;
+const STRIPE_FIXED_CENTS = 30;
+
+/** Charge such that, after Stripe's cut, we net exactly `netCents`. */
+export function grossForNet(netCents: number): number {
+  return Math.ceil((netCents + STRIPE_FIXED_CENTS) / (1 - STRIPE_PCT));
+}
+
+/**
+ * The business model: the first top-up is at cost (card fees only); every
+ * later top-up nets us one US Forever stamp of margin, "postage".
+ */
+export function checkoutAmountCents(
+  packUsd: number,
+  firstPurchase: boolean,
+  postageCents: number,
+): number {
+  const faceCents = packUsd * 100;
+  return grossForNet(faceCents + (firstPurchase ? 0 : postageCents));
+}
+
+export function postageCents(env: { POSTAGE_CENTS?: string }): number {
+  return Number(env.POSTAGE_CENTS ?? 82);
+}
+
+export async function hasPaidBefore(db: D1Database, userId: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM payments WHERE user_id = ? AND status = 'paid'")
+    .bind(userId)
+    .first<{ n: number }>();
+  return (row?.n ?? 0) > 0;
+}
 
 export const billing = new Hono<AppEnv>();
 
@@ -20,14 +55,18 @@ billing.post('/checkout', requireSession, async (c) => {
   const pack = PACKS[String(form.pack)];
   if (!pack) return jsonError(400, 'invalid_request', 'Unknown pack');
 
+  const first = !(await hasPaidBefore(c.env.DB, user.id));
+  const amount = checkoutAmountCents(pack.usd, first, postageCents(c.env));
+  const label = first ? 'first top-up, at cost' : 'includes postage';
+
   const params = new URLSearchParams({
     mode: 'payment',
     success_url: `${c.env.ISSUER}/dashboard?paid=1`,
     cancel_url: `${c.env.ISSUER}/dashboard`,
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'usd',
-    'line_items[0][price_data][unit_amount]': String(pack.usd * 100),
-    'line_items[0][price_data][product_data][name]': `tokenpony: ${pack.credits.toLocaleString('en-US')} credits`,
+    'line_items[0][price_data][unit_amount]': String(amount),
+    'line_items[0][price_data][product_data][name]': `tokenpony: ${pack.credits.toLocaleString('en-US')} credits (${label})`,
     'metadata[user_id]': user.id,
     'metadata[credits]': String(pack.credits),
   });
