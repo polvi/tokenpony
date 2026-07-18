@@ -16,7 +16,7 @@ degrades gracefully when they're missing.
 
 | Secret | Purpose | Without it |
 | --- | --- | --- |
-| `STRIPE_SECRET_KEY` | Creates Checkout Sessions for token packs. Standard test key works; a restricted key needs Checkout Sessions/Products/Prices: Write (inline `price_data`). | Dashboard shows "top-ups not configured"; `/billing/checkout` returns 503 |
+| `STRIPE_SECRET_KEY` | Creates Checkout Sessions for token packs. Standard test key works; a restricted key needs Checkout Sessions/Products/Prices: Write (inline `price_data`). | Dashboard shows "top-offs not configured"; `/billing/checkout` returns 503 |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret (`whsec_…`) of the Stripe webhook destination pointed at `https://api.tokenpony.dev/billing/webhook`, subscribed to the single event `checkout.session.completed` (snapshot payload, "your account" events, no Connect, no Subscriptions/Accounts v2 categories). | Webhook returns 503; paid sessions are never credited |
 | `AUTHGRAVITY_SERVICE_TOKEN` | `agk_…` service token from the AuthGravity console; lets the worker write account/application/grant relationship tuples on signup, app registration, and grant issuance. | Tuple writes are skipped; permission checks fall back to local D1 ownership guards |
 
@@ -66,9 +66,9 @@ Gateway Unified Billing, which needs prepaid credits on the account. Re-add it t
 
 Credits sell at face value. Every checkout passes Stripe's standard card fees
 (2.9% + 30 cents) through at cost via `grossForNet()` in `src/billing.ts`, so no
-purchase can net less than the credits' face value. A user's **first** top-up is
-charged exactly at cost; every later top-up nets one US Forever stamp of margin
+purchase can net less than the credits' face value. A user's **first** top-off is
+charged exactly at cost; every later top-off nets one US Forever stamp of margin
 ("postage", the `POSTAGE_CENTS` var, $0.82 since 2026-07-12). Update the var when
 USPS changes the rate. Caveat: international cards cost Stripe more (+1.5%); the
-pass-through uses domestic rates, so foreign-card top-ups can dip slightly below
+pass-through uses domestic rates, so foreign-card top-offs can dip slightly below
 cost.

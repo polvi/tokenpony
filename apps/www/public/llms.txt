@@ -15,7 +15,7 @@ revocable, and pseudonymous (they carry no user identity).
 
 All balances and budgets are CREDITS: 1 credit = US$0.000001 (so "$X per M tokens" equals
 exactly X credits per token). Users buy credits at the dashboard via Stripe at face value
-($1 = 1,000,000 credits); checkout adds card fees at cost, and after a user's first top-up
+($1 = 1,000,000 credits); checkout adds card fees at cost, and after a user's first top-off
 each purchase also adds postage: the price of one US Forever stamp (currently $0.82). There
 are no free credits. Per-model prices (USD per M input / cached input / output tokens) are
 published live on the models endpoint.
@@ -107,7 +107,7 @@ All errors: HTTP status + body { "error": { "code": "...", "message": "..." } }
 
     401 invalid_token       unknown/malformed/revoked-and-purged token
     402 budget_exhausted    grant budget spent -> run the authorize flow again for a new grant
-    402 balance_exhausted   the user's provider balance is empty -> user must top up
+    402 balance_exhausted   the user's provider balance is empty -> user must top off
     403 grant_revoked       the user revoked this grant at the provider
     400 invalid_grant       bad/expired/reused authorization code
     404 model_not_found     unknown model id; list {models_endpoint}

@@ -15,11 +15,12 @@ repo layout. Commit and deploy freely once changes are verified.
 ## Conventions
 
 - Site and product copy: no em dashes, and never the words "honest"/"honestly".
+- Purchases are called "top-off"/"top off", never "top-up"/"top up".
 - `apps/www/public/llms.txt` must stay pure ASCII and consistent with SPEC.md.
 - `apps/www/src/pages/spec.md` is generated from SPEC.md (same body, frontmatter added);
   regenerate it whenever SPEC.md changes.
 - Credits are micro-USD (1 credit = $0.000001). Never grant free credits; the postage
-  billing model lives in `apps/tokenpony/src/billing.ts` (first top-up at cost, later
+  billing model lives in `apps/tokenpony/src/billing.ts` (first top-off at cost, later
   ones net one Forever stamp; `POSTAGE_CENTS` var tracks the USPS rate).
 - Model catalog: `apps/tokenpony/src/models.ts`; prices come live from `env.AI.models()`
   with static fallbacks in `pricing.ts`. `moonshotai/kimi-k3` stays out of the catalog

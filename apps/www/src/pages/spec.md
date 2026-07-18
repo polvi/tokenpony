@@ -143,7 +143,7 @@ responses report usage in the final SSE chunk. Per-model rates are listed on `{m
 Error body shape: `{ "error": { "code": "budget_exhausted", "message": "…" } }`.
 
 When a grant runs dry the app simply starts a new authorization request; the user decides
-whether to top up the app.
+whether to top off the app.
 
 ## 7. Revocation
 

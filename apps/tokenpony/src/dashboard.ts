@@ -46,10 +46,15 @@ dashboard.get('/', async (c) => {
   const paid = c.req.query('paid');
 
   const first = !(await hasPaidBefore(c.env.DB, user.id));
+  const auto = await c.env.DB.prepare(
+    'SELECT card_last4, stripe_payment_method_id, autotopup_threshold, autotopup_credits FROM users WHERE id = ?',
+  )
+    .bind(user.id)
+    .first<{ card_last4: string | null; stripe_payment_method_id: string | null; autotopup_threshold: number | null; autotopup_credits: number | null }>();
   const stampUsd = (postageCents(c.env) / 100).toFixed(2);
   const feeNote = first
-    ? `Your first top-up is at cost: you pay only the card fees. After that, each top-up adds postage, the price of one US Forever stamp (currently $${stampUsd}).`
-    : `Each top-up passes card fees through at cost and adds postage: one US Forever stamp, currently $${stampUsd}.`;
+    ? `Your first top-off is at cost: you pay only the card fees. After that, each top-off adds postage, the price of one US Forever stamp (currently $${stampUsd}).`
+    : `Each top-off passes card fees through at cost and adds postage: one US Forever stamp, currently $${stampUsd}.`;
   const billing = stripeReady
     ? `<div class="row">${Object.entries(PACKS)
         .map(([id, p]) => {
@@ -61,7 +66,7 @@ dashboard.get('/', async (c) => {
         })
         .join('')}</div>
 <p class="muted">${feeNote}</p>`
-    : `<p class="muted">Top-ups aren't configured yet (Stripe keys pending).</p>`;
+    : `<p class="muted">Top-offs aren't configured yet (Stripe keys pending).</p>`;
 
   const keyRows =
     keys.results.map(
@@ -103,6 +108,33 @@ dashboard.get('/', async (c) => {
 <p class="muted mono">${esc(user.id)}</p>
 ${billing}
 
+<h2>Auto top-off</h2>
+${
+  auto?.stripe_payment_method_id
+    ? `<p class="muted">Card on file: ····${esc(auto.card_last4 ?? '????')}. ${
+        auto.autotopup_threshold && auto.autotopup_credits
+          ? `<strong>On:</strong> when your balance drops below ${fmt(auto.autotopup_threshold)} credits, we charge $${((checkoutAmountCents(auto.autotopup_credits / 1_000_000, false, postageCents(c.env))) / 100).toFixed(2)} for ${fmt(auto.autotopup_credits)} credits (includes postage).`
+          : '<strong>Off.</strong> Enable it to refill automatically; auto top-offs are priced like any later top-off (face value + postage + card fees).'
+      }</p>
+<form method="post" action="/dashboard/autotopup" class="row">
+  <label class="muted">Below
+    <select name="threshold">
+      <option value="50000">50,000 credits</option>
+      <option value="100000" selected>100,000 credits</option>
+      <option value="500000">500,000 credits</option>
+    </select>
+  </label>
+  <label class="muted">buy
+    <select name="pack">
+      ${Object.entries(PACKS).map(([id, p]) => `<option value="${id}">${fmt(p.credits)} credits</option>`).join('')}
+    </select>
+  </label>
+  <button type="submit" name="action" value="enable">${auto.autotopup_threshold ? 'Update' : 'Enable'}</button>
+  ${auto.autotopup_threshold ? '<button type="submit" name="action" value="disable" class="quiet">Disable</button>' : ''}
+</form>`
+    : '<p class="muted">Complete a top-off first. Your card is saved securely with Stripe at checkout, and you can then have the barn refill itself.</p>'
+}
+
 <h2>Connected apps (TPX grants)</h2>
 <table><tr><th>App</th><th>Budget used</th><th>Status</th><th></th></tr>${grantRows}</table>
 
@@ -130,6 +162,35 @@ ${billing}
 <form method="post" action="${esc(c.env.AUTHGRAVITY_URL)}/v1/logout"><button class="quiet">Log out</button></form>`,
     ),
   );
+});
+
+dashboard.post('/autotopup', async (c) => {
+  const user = c.get('user');
+  const form = await c.req.parseBody();
+  if (form.action === 'disable') {
+    await c.env.DB.prepare(
+      'UPDATE users SET autotopup_threshold = NULL, autotopup_credits = NULL WHERE id = ?',
+    )
+      .bind(user.id)
+      .run();
+    return c.redirect('/dashboard');
+  }
+  const threshold = Number(form.threshold);
+  const pack = PACKS[String(form.pack)];
+  const hasCard = await c.env.DB.prepare(
+    'SELECT stripe_payment_method_id FROM users WHERE id = ?',
+  )
+    .bind(user.id)
+    .first<{ stripe_payment_method_id: string | null }>();
+  if (!pack || !Number.isInteger(threshold) || threshold < 1 || threshold > 1_000_000 || !hasCard?.stripe_payment_method_id) {
+    return c.redirect('/dashboard');
+  }
+  await c.env.DB.prepare(
+    'UPDATE users SET autotopup_threshold = ?, autotopup_credits = ? WHERE id = ?',
+  )
+    .bind(threshold, pack.credits, user.id)
+    .run();
+  return c.redirect('/dashboard');
 });
 
 dashboard.post('/keys', async (c) => {

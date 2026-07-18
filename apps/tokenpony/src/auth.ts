@@ -7,7 +7,7 @@ export interface SessionUser {
   balance_credits: number;
 }
 
-// No free credits: accounts start empty and top up via Stripe ($1 minimum).
+// No free credits: accounts start empty and top off via Stripe ($1 minimum).
 const STARTER_BALANCE = 0;
 
 /** Validate the AuthGravity session by forwarding the cookie (or bearer session id). */

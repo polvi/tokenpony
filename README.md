@@ -34,8 +34,8 @@ apps/ponychat/     demo TPX client Worker (Hono + KV) -> ponychat.tokenpony.dev
 Balances and budgets are **credits**: 1 credit = US$0.000001, so a model's "$X per M
 tokens" rate is exactly X credits per token. Per-model prices are pulled live from the
 Workers AI catalog and every completion returns a `usage.credits_charged` extension.
-Credits sell at face value; checkout passes Stripe fees through at cost, the first top-up
-is charged exactly at cost, and each later top-up nets one US Forever stamp of margin
+Credits sell at face value; checkout passes Stripe fees through at cost, the first top-off
+is charged exactly at cost, and each later top-off nets one US Forever stamp of margin
 ("postage"). Details in [apps/tokenpony/README.md](apps/tokenpony/README.md).
 
 ## Development

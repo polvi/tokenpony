@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { maybeAutoTopup } from './billing';
 import { MODELS, resolveModel, type ModelEntry } from './models';
 import { creditsFor, getPrices, priceFor, type ModelPrice, type TokenCounts } from './pricing';
 import { estimateTokens, jsonError, sha256Hex } from './util';
@@ -42,7 +43,7 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     if (!row) return jsonError(401, 'invalid_token', 'Unknown API key');
     if (row.revoked) return jsonError(401, 'invalid_token', 'API key revoked');
     if (row.balance_credits <= 0)
-      return jsonError(402, 'balance_exhausted', 'Your tokenpony credit balance is empty; top up at https://api.tokenpony.dev/dashboard');
+      return jsonError(402, 'balance_exhausted', 'Your tokenpony credit balance is empty; top off at https://api.tokenpony.dev/dashboard');
     return { userId: row.user_id, balance: row.balance_credits, apiKeyId: row.key_id };
   }
 
@@ -114,6 +115,8 @@ async function debit(
     );
   }
   await c.env.DB.batch(stmts);
+  // Refill the balance off-session if the user opted into auto top-off.
+  c.executionCtx.waitUntil(maybeAutoTopup(c.env, spender.userId));
 }
 
 interface RawUsage {
