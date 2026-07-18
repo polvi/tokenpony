@@ -41,13 +41,13 @@ secret; it is shown once and held hashed server-side.
     POST {registration_endpoint}
     Content-Type: application/json
     { "name": "My App", "redirect_uris": ["https://myapp.example/callback"] }
-    -> { "client_id": "app_…", "client_secret": "cs_…" }
+    -> { "client_id": "app_...", "client_secret": "cs_..." }
 
     redirect_uris must be https (localhost allowed for development).
 
 Step 2. Authorize. Send the user's browser to:
 
-    {authorization_endpoint}?client_id=app_…
+    {authorization_endpoint}?client_id=app_...
       &redirect_uri=https://myapp.example/callback   (must exactly match a registered URI)
       &state={opaque-csrf-value}                     (required; verify on return)
       &budget={credits}                              (integer 1..10000000, i.e. up to $10)
@@ -55,7 +55,7 @@ Step 2. Authorize. Send the user's browser to:
 The provider authenticates the user (tokenpony uses passkeys via AuthGravity) and shows a
 consent page with your app name and the requested budget. On approval:
 
-    302 {redirect_uri}?code=tpxc_…&state={state}     (code is single-use, expires in 5 min)
+    302 {redirect_uri}?code=tpxc_...&state={state}     (code is single-use, expires in 5 min)
 
 On denial: 302 {redirect_uri}?error=access_denied&state={state}
 
@@ -65,13 +65,13 @@ Step 3. Exchange the code (server-side).
     Content-Type: application/json
     {
       "grant_type": "authorization_code",
-      "code": "tpxc_…",
-      "client_id": "app_…",
-      "client_secret": "cs_…",
+      "code": "tpxc_...",
+      "client_id": "app_...",
+      "client_secret": "cs_...",
       "redirect_uri": "https://myapp.example/callback"
     }
     -> {
-      "access_token": "tpx_…",
+      "access_token": "tpx_...",
       "token_type": "bearer",
       "budget": 100000,
       "budget_used": 0,
@@ -83,7 +83,7 @@ setting baseURL={api_base} and apiKey={access_token}.
 
     GET  {api_base}/models          (no auth required; includes live per-model pricing)
     POST {api_base}/chat/completions
-    Authorization: Bearer tpx_…
+    Authorization: Bearer tpx_...
     { "model": "llama-3.3-70b", "messages": [{"role":"user","content":"hi"}],
       "stream": true|false, "max_tokens": 2048, "temperature": 0.7 }
 
@@ -116,7 +116,7 @@ to top the app up. Never ask users for provider API keys; that is what grants re
 
 ## Personal API keys (non-TPX path)
 
-Users can mint personal keys (sk_…) in the dashboard and use them directly against
+Users can mint personal keys (sk_...) in the dashboard and use them directly against
 {api_base} with any OpenAI SDK. Same metering, same error shapes.
 
 ## Security notes
