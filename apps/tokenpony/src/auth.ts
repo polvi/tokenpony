@@ -7,8 +7,8 @@ export interface SessionUser {
   balance_credits: number;
 }
 
-// 250,000 credits = US$0.25 of starter inference.
-const STARTER_BALANCE = 250_000;
+// No free credits: accounts start empty and top up via Stripe ($1 minimum).
+const STARTER_BALANCE = 0;
 
 /** Validate the AuthGravity session by forwarding the cookie (or bearer session id). */
 export async function whoami(c: Context<AppEnv>): Promise<string | null> {

@@ -121,7 +121,7 @@ export function connectPage(defaultIssuer: string, error?: string): string {
       </div>
       <button type="submit">Connect provider →</button>
     </form>
-    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and start with free demo credits.
+    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and top-ups start at $1.
     Already connected before? Check your balance at <a href="${esc(defaultIssuer)}/dashboard">your provider's dashboard</a>.</p>
   </div>
 </main>`,

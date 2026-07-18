@@ -55,7 +55,7 @@ dashboard.get('/', async (c) => {
              </form>`,
         )
         .join('')}</div>`
-    : `<p class="muted">Top-ups aren't configured yet (Stripe keys pending). New accounts start with 250,000 free credits.</p>`;
+    : `<p class="muted">Top-ups aren't configured yet (Stripe keys pending).</p>`;
 
   const keyRows =
     keys.results.map(

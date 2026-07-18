@@ -5,6 +5,7 @@ import type { AppEnv } from './types';
 
 // Credits are micro-USD: the $5 pack is at par, the $20 pack carries a bonus.
 export const PACKS: Record<string, { usd: number; credits: number }> = {
+  demo: { usd: 1, credits: 1_000_000 },
   saddlebag: { usd: 5, credits: 5_000_000 },
   wagon: { usd: 20, credits: 25_000_000 },
 };
