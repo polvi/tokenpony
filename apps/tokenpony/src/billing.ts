@@ -25,7 +25,7 @@ billing.post('/checkout', requireSession, async (c) => {
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'usd',
     'line_items[0][price_data][unit_amount]': String(pack.usd * 100),
-    'line_items[0][price_data][product_data][name]': `tokenpony — ${pack.tokens.toLocaleString('en-US')} tokens`,
+    'line_items[0][price_data][product_data][name]': `tokenpony: ${pack.tokens.toLocaleString('en-US')} tokens`,
     'metadata[user_id]': user.id,
     'metadata[tokens]': String(pack.tokens),
   });

@@ -47,7 +47,7 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     if (!row) return jsonError(401, 'invalid_token', 'Unknown API key');
     if (row.revoked) return jsonError(401, 'invalid_token', 'API key revoked');
     if (row.balance_tokens <= 0)
-      return jsonError(402, 'balance_exhausted', 'Your tokenpony balance is empty — top up at https://api.tokenpony.dev/dashboard');
+      return jsonError(402, 'balance_exhausted', 'Your tokenpony balance is empty; top up at https://api.tokenpony.dev/dashboard');
     return { userId: row.user_id, balance: row.balance_tokens, apiKeyId: row.key_id };
   }
 
@@ -70,7 +70,7 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
       return jsonError(403, 'grant_revoked', 'The user revoked this grant');
     const remaining = row.budget_total - row.budget_used;
     if (remaining <= 0)
-      return jsonError(402, 'budget_exhausted', 'Grant budget spent — request a new authorization');
+      return jsonError(402, 'budget_exhausted', 'Grant budget spent; request a new authorization');
     if (row.balance_tokens <= 0)
       return jsonError(402, 'balance_exhausted', "The user's provider balance is empty");
     return {
@@ -209,7 +209,7 @@ api.post('/chat/completions', async (c) => {
 
   const model = resolveModel(body.model);
   if (!model)
-    return jsonError(404, 'model_not_found', `Unknown model '${body.model}' — see /v1/models`);
+    return jsonError(404, 'model_not_found', `Unknown model '${body.model}'; see /v1/models`);
 
   // Cap completion size to what the spender can still afford (grant budget or balance).
   const affordable = Math.min(

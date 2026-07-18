@@ -50,7 +50,7 @@ dashboard.get('/', async (c) => {
           ([id, p]) =>
             `<form method="post" action="/billing/checkout" class="inline">
                <input type="hidden" name="pack" value="${id}">
-               <button type="submit">Buy ${fmt(p.tokens)} tokens — $${p.usd}</button>
+               <button type="submit">Buy ${fmt(p.tokens)} tokens for $${p.usd}</button>
              </form>`,
         )
         .join('')}</div>`
@@ -88,8 +88,8 @@ dashboard.get('/', async (c) => {
 
   return c.html(
     page(
-      'Dashboard — tokenpony',
-      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Tokens are credited when Stripe confirms — refresh in a moment.</div>' : ''}
+      'Dashboard · tokenpony',
+      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Tokens are credited when Stripe confirms; refresh in a moment.</div>' : ''}
 <p class="eyebrow">Your account</p>
 <h1>Balance: <span class="stat">${fmt(user.balance_tokens)}</span> tokens</h1>
 <p class="muted mono">${esc(user.id)}</p>
@@ -116,7 +116,7 @@ ${billing}
   <input type="url" name="redirect_uri" placeholder="https://yourapp.example/callback" required>
   <button type="submit">Register app</button>
 </form>
-<p class="muted">Registration is also open via <code>POST /tpx/register</code> — see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
+<p class="muted">Registration is also open via <code>POST /tpx/register</code>; see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
 
 <h2>Session</h2>
 <form method="post" action="${esc(c.env.AUTHGRAVITY_URL)}/v1/logout"><button class="quiet">Log out</button></form>`,
@@ -134,9 +134,9 @@ dashboard.post('/keys', async (c) => {
     .run();
   return c.html(
     page(
-      'API key created — tokenpony',
+      'API key created · tokenpony',
       `<p class="eyebrow">API key created</p>
-<h1>Copy it now — it won't be shown again.</h1>
+<h1>Copy it now; it won't be shown again.</h1>
 <div class="reveal">${esc(key)}</div>
 <p style="margin-top:1rem"><code>curl https://api.tokenpony.dev/v1/chat/completions -H "Authorization: Bearer ${esc(key)}" …</code></p>
 <p><a class="btn" href="/dashboard">Back to dashboard</a></p>`,
@@ -157,7 +157,7 @@ dashboard.post('/grants/:id/revoke', async (c) => {
   // ownership guard in the UPDATE when authz can't answer.
   const allowed = await checkPermission(c, `grant:${grantId}`, 'revoke');
   if (allowed === false) {
-    return c.html(page('Not allowed — tokenpony', '<h1>You cannot revoke this grant.</h1><p><a href="/dashboard">Back</a></p>'), 403);
+    return c.html(page('Not allowed · tokenpony', '<h1>You cannot revoke this grant.</h1><p><a href="/dashboard">Back</a></p>'), 403);
   }
   await c.env.DB.prepare("UPDATE grants SET status = 'revoked' WHERE id = ? AND user_id = ?")
     .bind(grantId, c.get('user').id)
@@ -174,7 +174,7 @@ dashboard.post('/apps', async (c) => {
     const u = new URL(redirectUri);
     if (u.protocol !== 'https:' && u.hostname !== 'localhost') throw new Error('not https');
   } catch {
-    return c.html(page('Invalid redirect URI — tokenpony', '<h1>redirect_uri must be a valid https URL.</h1><p><a href="/dashboard">Back</a></p>'), 400);
+    return c.html(page('Invalid redirect URI · tokenpony', '<h1>redirect_uri must be a valid https URL.</h1><p><a href="/dashboard">Back</a></p>'), 400);
   }
   if (!name) return c.redirect('/dashboard');
 
@@ -188,10 +188,10 @@ dashboard.post('/apps', async (c) => {
   c.executionCtx.waitUntil(writeTuples(c.env, applicationTuples(clientId, user.id)));
   return c.html(
     page(
-      'App registered — tokenpony',
+      'App registered · tokenpony',
       `<p class="eyebrow">App registered</p>
 <h1>${esc(name)}</h1>
-<p>Copy the client secret now — it won't be shown again.</p>
+<p>Copy the client secret now; it won't be shown again.</p>
 <p class="mono">client_id</p><div class="reveal">${esc(clientId)}</div>
 <p class="mono" style="margin-top:1rem">client_secret</p><div class="reveal">${esc(clientSecret)}</div>
 <p style="margin-top:1rem"><a class="btn" href="/dashboard">Back to dashboard</a></p>`,

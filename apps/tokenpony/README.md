@@ -11,13 +11,13 @@ Configured in `wrangler.jsonc`: `AI` (Workers AI), `DB` (D1 `tokenpony`), plus v
 
 ## Secrets
 
-Set with `wrangler secret put <NAME>` from this directory. All are optional — the worker
+Set with `wrangler secret put <NAME>` from this directory. All are optional; the worker
 degrades gracefully when they're missing.
 
 | Secret | Purpose | Without it |
 | --- | --- | --- |
 | `STRIPE_SECRET_KEY` | Creates Checkout Sessions for token packs. Standard test key works; a restricted key needs Checkout Sessions/Products/Prices: Write (inline `price_data`). | Dashboard shows "top-ups not configured"; `/billing/checkout` returns 503 |
-| `STRIPE_WEBHOOK_SECRET` | Signing secret (`whsec_…`) of the Stripe webhook destination pointed at `https://api.tokenpony.dev/billing/webhook`, subscribed to the single event `checkout.session.completed` (snapshot payload, "your account" events — no Connect, no Subscriptions/Accounts v2 categories). | Webhook returns 503; paid sessions are never credited |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret (`whsec_…`) of the Stripe webhook destination pointed at `https://api.tokenpony.dev/billing/webhook`, subscribed to the single event `checkout.session.completed` (snapshot payload, "your account" events, no Connect, no Subscriptions/Accounts v2 categories). | Webhook returns 503; paid sessions are never credited |
 | `AUTHGRAVITY_SERVICE_TOKEN` | `agk_…` service token from the AuthGravity console; lets the worker write account/application/grant relationship tuples on signup, app registration, and grant issuance. | Tuple writes are skipped; permission checks fall back to local D1 ownership guards |
 
 Both Stripe secrets were set on 2026-07-17 (test mode).

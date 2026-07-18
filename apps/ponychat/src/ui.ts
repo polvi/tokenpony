@@ -69,7 +69,7 @@ const chatCss = `
 
 export function connectPage(defaultIssuer: string, error?: string): string {
   return shell(
-    'Pony Chat — bring your own tokens',
+    'Pony Chat: bring your own tokens',
     `<header class="bar">
   <span class="wordmark">Pony Chat<small>TPX DEMO</small></span>
   <span class="muted">an LLM app with <strong>zero</strong> API keys</span>
@@ -79,7 +79,7 @@ export function connectPage(defaultIssuer: string, error?: string): string {
     <p class="eyebrow">Token Pony Express</p>
     <h1>This app has no API keys. Bring your own tokens.</h1>
     <p class="muted">Pony Chat ships with no LLM credentials and no inference bill. Connect a
-    token provider you pay — it asks for a metered budget, you approve it with a passkey,
+    token provider you pay: it asks for a metered budget, you approve it with a passkey,
     and every completion is metered against that grant. Revoke it any time at your provider.</p>
     ${error ? `<p style="color:var(--red)"><strong>${esc(error)}</strong></p>` : ''}
     <form class="card" method="post" action="/connect">
@@ -97,7 +97,7 @@ export function connectPage(defaultIssuer: string, error?: string): string {
       </div>
       <button type="submit">Connect provider →</button>
     </form>
-    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider — accounts take one passkey tap and start with 100k free tokens.</p>
+    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and start with 100k free tokens.</p>
   </div>
 </main>`,
   );
@@ -116,7 +116,7 @@ export function chatPage(issuer: string, budget: number): string {
 </header>
 <main>
   <div id="log">
-    <div class="msg assistant">Saddled up. Your provider grant is loaded — ask me anything.</div>
+    <div class="msg assistant">Saddled up. Your provider grant is loaded. Ask me anything.</div>
   </div>
   <form id="composer">
     <input id="prompt" autocomplete="off" placeholder="Write a message…" required>
