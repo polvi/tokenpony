@@ -12,6 +12,15 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+
+const navLinks = [
+  { href: '/#how', label: 'How it works' },
+  { href: '/#models', label: 'Models' },
+  { href: '/#developers', label: 'Developers' },
+  { href: '/spec', label: 'Spec' },
+  { href: 'https://api.tokenpony.dev/dashboard', label: 'Dashboard' },
+];
+const ctaLink = { href: 'https://ponychat.tokenpony.dev', label: 'Try Pony Chat' };
 ---
 
 <!doctype html>
@@ -27,15 +36,23 @@ const { title, description } = Astro.props;
     <div class="hatch" aria-hidden="true"></div>
     <header class="site-header wrap">
       <a class="wordmark" href="/">tokenpony</a>
-      <nav aria-label="Site">
-        <a href="/eli5">ELI5</a>
-        <a href="/#how">How it works</a>
-        <a href="/#models">Models</a>
-        <a href="/#developers">Developers</a>
-        <a href="/spec">Spec</a>
-        <a href="https://api.tokenpony.dev/dashboard">Dashboard</a>
-        <a class="nav-cta" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
+      <nav class="nav-desktop" aria-label="Site">
+        {navLinks.map((l) => <a href={l.href}>{l.label}</a>)}
+        <a class="nav-cta" href={ctaLink.href}>{ctaLink.label}</a>
       </nav>
+      <details class="nav-mobile">
+        <summary aria-label="Open menu">
+          <svg width="24" height="18" viewBox="0 0 24 18" aria-hidden="true">
+            <rect width="24" height="3" rx="1.5" fill="currentColor"></rect>
+            <rect y="7.5" width="24" height="3" rx="1.5" fill="currentColor"></rect>
+            <rect y="15" width="24" height="3" rx="1.5" fill="currentColor"></rect>
+          </svg>
+        </summary>
+        <nav aria-label="Site">
+          {navLinks.map((l) => <a href={l.href}>{l.label}</a>)}
+          <a class="nav-cta" href={ctaLink.href}>{ctaLink.label}</a>
+        </nav>
+      </details>
     </header>
     <slot />
     <footer>
@@ -49,6 +66,7 @@ const { title, description } = Astro.props;
           <a href="https://ponychat.tokenpony.dev">Pony Chat</a>
           <a href="https://api.tokenpony.dev/dashboard">Dashboard</a>
           <a href="/spec">TPX v0.1 spec</a>
+          <a href="/eli5">The campfire version (ELI5)</a>
           <a href="https://api.tokenpony.dev/.well-known/tpx">Discovery document</a>
         </nav>
       </div>
@@ -59,11 +77,11 @@ const { title, description } = Astro.props;
 <style>
   .site-header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    flex-wrap: wrap;
     padding-block: 1.25rem;
+    position: relative;
   }
 
   .wordmark {
@@ -72,13 +90,6 @@ const { title, description } = Astro.props;
     font-size: 1.5rem;
     color: var(--ink);
     text-decoration: none;
-  }
-
-  nav {
-    display: flex;
-    gap: 1.4rem;
-    flex-wrap: wrap;
-    font-size: 0.95rem;
   }
 
   nav a {
@@ -95,6 +106,84 @@ const { title, description } = Astro.props;
   .nav-cta {
     color: var(--blue);
     font-weight: 600;
+  }
+
+  .nav-desktop {
+    display: flex;
+    gap: 1.4rem;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+    align-items: baseline;
+  }
+
+  /* Pancake menu, no JS: details/summary */
+  .nav-mobile {
+    display: none;
+    position: relative;
+  }
+
+  .nav-mobile summary {
+    list-style: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    color: var(--ink);
+    background: var(--card);
+    box-shadow: 2px 2px 0 var(--rule);
+  }
+
+  .nav-mobile summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .nav-mobile[open] summary {
+    background: var(--panel);
+    translate: 1px 1px;
+    box-shadow: 1px 1px 0 var(--rule);
+  }
+
+  .nav-mobile nav {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 10;
+    min-width: 13rem;
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    box-shadow: 4px 4px 0 var(--rule);
+    padding: 0.4rem 0;
+  }
+
+  .nav-mobile nav a {
+    padding: 0.65rem 1.1rem;
+    border-bottom: 1px dashed var(--rule);
+    font-size: 1rem;
+  }
+
+  .nav-mobile nav a:last-child {
+    border-bottom: none;
+  }
+
+  .nav-mobile nav a:hover {
+    background: var(--panel);
+    text-decoration: none;
+  }
+
+  @media (max-width: 45rem) {
+    .nav-desktop {
+      display: none;
+    }
+
+    .nav-mobile {
+      display: block;
+    }
   }
 
   footer {

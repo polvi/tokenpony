@@ -53,9 +53,6 @@ const steps = [
           <a class="btn btn-primary" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
           <a class="btn btn-ghost" href="/spec">Read the spec</a>
         </div>
-        <p class="eli5-callout">
-          New to all this? There's an <a href="/eli5">ELI5: the campfire version</a>.
-        </p>
       </div>
       <figure class="envelope" aria-label="TPX discovery request, styled as an airmail envelope">
         <div class="postmark" aria-hidden="true">
@@ -114,6 +111,10 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
             </p>
           </article>
         </div>
+        <p class="plain-talk">
+          Prefer plain talk? <a href="/eli5">The campfire version</a> explains all of this
+          with hay.
+        </p>
       </div>
     </section>
 
@@ -346,11 +347,6 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     background: var(--panel);
   }
 
-  .eli5-callout {
-    margin-top: 1rem;
-    font-size: 0.95rem;
-    color: var(--muted);
-  }
 
   /* The envelope */
   .envelope {
@@ -431,6 +427,16 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
   .why-grid p {
     color: #c3c7d4;
     font-size: 0.98rem;
+  }
+
+  .plain-talk {
+    margin-top: 2rem;
+    font-size: 0.92rem;
+    color: #8a90a6;
+  }
+
+  .plain-talk a {
+    color: #f0c9c2;
   }
 
   /* Waybill */
