@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { api } from './api';
-import { tpp, discoveryDoc } from './tpp';
+import { tpx, discoveryDoc } from './tpx';
 import { dashboard } from './dashboard';
 import { billing } from './billing';
 import { jsonError } from './util';
@@ -13,7 +13,7 @@ app.onError((err, c) => {
   return jsonError(500, 'internal_error', 'Something went wrong');
 });
 
-// CORS for the API + TPP endpoints so browser apps can call them directly.
+// CORS for the API + TPX endpoints so browser apps can call them directly.
 app.use('*', async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     return c.body(null, 204, {
@@ -25,15 +25,15 @@ app.use('*', async (c, next) => {
   }
   await next();
   const path = new URL(c.req.url).pathname;
-  if (path.startsWith('/v1') || path.startsWith('/tpp/token') || path === '/.well-known/tpp') {
+  if (path.startsWith('/v1') || path.startsWith('/tpx/token') || path === '/.well-known/tpx') {
     c.res.headers.set('access-control-allow-origin', '*');
   }
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));
-app.get('/.well-known/tpp', (c) => c.json(discoveryDoc(c.env.ISSUER)));
+app.get('/.well-known/tpx', (c) => c.json(discoveryDoc(c.env.ISSUER)));
 app.route('/v1', api);
-app.route('/tpp', tpp);
+app.route('/tpx', tpx);
 app.route('/dashboard', dashboard);
 app.route('/billing', billing);
 

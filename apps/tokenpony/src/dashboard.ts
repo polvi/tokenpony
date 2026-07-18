@@ -94,7 +94,7 @@ dashboard.get('/', async (c) => {
 <p class="muted mono">${esc(user.id)}</p>
 ${billing}
 
-<h2>Connected apps (TPP grants)</h2>
+<h2>Connected apps (TPX grants)</h2>
 <table><tr><th>App</th><th>Budget used</th><th>Status</th><th></th></tr>${grantRows}</table>
 
 <h2>Personal API keys</h2>
@@ -115,7 +115,7 @@ ${billing}
   <input type="url" name="redirect_uri" placeholder="https://yourapp.example/callback" required>
   <button type="submit">Register app</button>
 </form>
-<p class="muted">Registration is also open via <code>POST /tpp/register</code> — see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
+<p class="muted">Registration is also open via <code>POST /tpx/register</code> — see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
 
 <h2>Session</h2>
 <form method="post" action="${esc(c.env.AUTHGRAVITY_URL)}/v1/logout"><button class="quiet">Log out</button></form>`,

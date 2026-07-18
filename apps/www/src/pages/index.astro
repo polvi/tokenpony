@@ -13,7 +13,7 @@ const steps = [
   {
     n: '01',
     name: 'Discover',
-    body: 'The app fetches /.well-known/tpp from whichever provider the user names. One JSON document lists the authorize, token, and API endpoints.',
+    body: 'The app fetches /.well-known/tpx from whichever provider the user names. One JSON document lists the authorize, token, and API endpoints.',
   },
   {
     n: '02',
@@ -23,7 +23,7 @@ const steps = [
   {
     n: '03',
     name: 'Grant',
-    body: 'The app exchanges a one-time code for a tpp_ access token — scoped to that budget, tied to that app, revocable any time.',
+    body: 'The app exchanges a one-time code for a tpx_ access token — scoped to that budget, tied to that app, revocable any time.',
   },
   {
     n: '04',
@@ -35,16 +35,16 @@ const steps = [
 
 <Layout
   title="tokenpony — bring your own tokens to any LLM app"
-  description="tokenpony is an LLM proxy for Cloudflare's open-source models and the first provider to speak TPP, an OAuth-style protocol where apps ship without API keys and users bring their own token budget."
+  description="tokenpony is an LLM proxy for Cloudflare's open-source models and the first provider to speak TPX, an OAuth-style protocol where apps ship without API keys and users bring their own token budget."
 >
   <main>
     <section class="hero wrap">
       <div class="hero-copy">
-        <p class="eyebrow">Token Pony Protocol · TPP v0.1 · proof of concept</p>
+        <p class="eyebrow">Token Pony Express · TPX v0.1 · proof of concept</p>
         <h1>Bring your own tokens to any LLM&nbsp;app.</h1>
         <p class="lede">
           tokenpony is an LLM proxy for Cloudflare’s open-source models — and the first provider
-          to speak <strong>TPP</strong>, an OAuth-style protocol where apps ship without API keys
+          to speak <strong>TPX</strong>, an OAuth-style protocol where apps ship without API keys
           and you pay a token provider you choose. The app gets a metered budget. You keep the
           reins.
         </p>
@@ -53,7 +53,7 @@ const steps = [
           <a class="btn btn-ghost" href="/spec">Read the spec</a>
         </div>
       </div>
-      <figure class="envelope" aria-label="TPP discovery request, styled as an airmail envelope">
+      <figure class="envelope" aria-label="TPX discovery request, styled as an airmail envelope">
         <div class="postmark" aria-hidden="true">
           <svg viewBox="0 0 120 120" width="110" height="110">
             <defs>
@@ -62,20 +62,20 @@ const steps = [
             <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="2" />
             <circle cx="60" cy="60" r="32" fill="none" stroke="currentColor" stroke-width="1.5" />
             <text font-size="10.5" letter-spacing="2.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
-              <textPath href="#ring">TOKENPONY · TPP/0.1 · USER-PAID ·</textPath>
+              <textPath href="#ring">TOKENPONY · TPX/0.1 · USER-PAID ·</textPath>
             </text>
             <text x="60" y="57" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">EST.</text>
             <text x="60" y="69" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">2026</text>
           </svg>
         </div>
-        <pre><code><span class="c"># any TPP provider, one request</span>
-$ curl https://api.tokenpony.dev/.well-known/tpp
+        <pre><code><span class="c"># any TPX provider, one request</span>
+$ curl https://api.tokenpony.dev/.well-known/tpx
 
 &#123;
-  "tpp_version": "0.1",
+  "tpx_version": "0.1",
   "issuer": "https://api.tokenpony.dev",
-  "authorization_endpoint": "…/tpp/authorize",
-  "token_endpoint": "…/tpp/token",
+  "authorization_endpoint": "…/tpx/authorize",
+  "token_endpoint": "…/tpx/token",
   "api_base": "…/v1"
 &#125;</code></pre>
       </figure>
@@ -94,7 +94,7 @@ $ curl https://api.tokenpony.dev/.well-known/tpp
             </p>
           </article>
           <article>
-            <h3>With TPP, you bring a budget</h3>
+            <h3>With TPX, you bring a budget</h3>
             <p>
               You hold one balance with a provider you trust. An app asks for a scoped grant —
               say, 100k tokens — and you approve it with a passkey. The app never sees your keys
@@ -115,7 +115,7 @@ $ curl https://api.tokenpony.dev/.well-known/tpp
 
     <section id="how" class="wrap route">
       <p class="eyebrow">The route</p>
-      <h2>OAuth taught apps to ask for identity.<br />TPP teaches them to ask for tokens.</h2>
+      <h2>OAuth taught apps to ask for identity.<br />TPX teaches them to ask for tokens.</h2>
       <ol class="waybill">
         {
           steps.map((s) => (
@@ -137,7 +137,7 @@ $ curl https://api.tokenpony.dev/.well-known/tpp
         <h2>Open-weight models only.</h2>
         <p class="section-lede">
           Served from Cloudflare Workers AI. Every model here has published weights — any
-          provider can run them, so no app built on TPP is locked to us.
+          provider can run them, so no app built on TPX is locked to us.
         </p>
         <ul class="stamp-sheet">
           {
@@ -163,15 +163,15 @@ $ curl https://api.tokenpony.dev/.well-known/tpp
         authorize, and never touch an inference bill again.
       </p>
       <pre class="quickstart"><code><span class="c"># register your app (open registration in the PoC)</span>
-$ curl -X POST https://api.tokenpony.dev/tpp/register \
+$ curl -X POST https://api.tokenpony.dev/tpx/register \
     -d '&#123;"name":"My App","redirect_uris":["https://myapp.example/callback"]&#125;'
 
 <span class="c"># send the user to approve a budget</span>
-https://api.tokenpony.dev/tpp/authorize?client_id=…&redirect_uri=…&budget=100000&state=…
+https://api.tokenpony.dev/tpx/authorize?client_id=…&redirect_uri=…&budget=100000&state=…
 
 <span class="c"># exchange the code, then chat on the user’s tokens</span>
 $ curl https://api.tokenpony.dev/v1/chat/completions \
-    -H "Authorization: Bearer tpp_…" \
+    -H "Authorization: Bearer tpx_…" \
     -d '&#123;"model":"llama-3.3-70b","messages":[&#123;"role":"user","content":"hi"&#125;]&#125;'</code></pre>
     </section>
   </main>

@@ -71,12 +71,12 @@ export function connectPage(defaultIssuer: string, error?: string): string {
   return shell(
     'Pony Chat — bring your own tokens',
     `<header class="bar">
-  <span class="wordmark">Pony Chat<small>TPP DEMO</small></span>
+  <span class="wordmark">Pony Chat<small>TPX DEMO</small></span>
   <span class="muted">an LLM app with <strong>zero</strong> API keys</span>
 </header>
 <main>
   <div class="connect">
-    <p class="eyebrow">Token Pony Protocol</p>
+    <p class="eyebrow">Token Pony Express</p>
     <h1>This app has no API keys. Bring your own tokens.</h1>
     <p class="muted">Pony Chat ships with no LLM credentials and no inference bill. Connect a
     token provider you pay — it asks for a metered budget, you approve it with a passkey,
@@ -84,7 +84,7 @@ export function connectPage(defaultIssuer: string, error?: string): string {
     ${error ? `<p style="color:var(--red)"><strong>${esc(error)}</strong></p>` : ''}
     <form class="card" method="post" action="/connect">
       <div class="field">
-        <label for="issuer">Token provider (any TPP issuer)</label>
+        <label for="issuer">Token provider (any TPX issuer)</label>
         <input id="issuer" name="issuer" type="url" value="${esc(defaultIssuer)}" required>
       </div>
       <div class="field">
@@ -107,7 +107,7 @@ export function chatPage(issuer: string, budget: number): string {
   return shell(
     'Pony Chat',
     `<header class="bar">
-  <span class="wordmark">Pony Chat<small>TPP DEMO</small></span>
+  <span class="wordmark">Pony Chat<small>TPX DEMO</small></span>
   <span class="meter">grant <b id="used">0</b> / ${budget.toLocaleString('en-US')} tokens · <span class="mono">${esc(new URL(issuer).host)}</span></span>
   <span>
     <select id="model" class="quiet"></select>

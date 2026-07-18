@@ -23,7 +23,7 @@ interface Usage {
   total_tokens: number;
 }
 
-/** Who is spending: a personal key or a TPP grant. */
+/** Who is spending: a personal key or a TPX grant. */
 interface Spender {
   userId: string;
   balance: number;
@@ -51,7 +51,7 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     return { userId: row.user_id, balance: row.balance_tokens, apiKeyId: row.key_id };
   }
 
-  if (token.startsWith('tpp_')) {
+  if (token.startsWith('tpx_')) {
     const row = await c.env.DB.prepare(
       `SELECT g.id AS grant_id, g.status, g.budget_total, g.budget_used, u.id AS user_id, u.balance_tokens
        FROM grants g JOIN users u ON u.id = g.user_id WHERE g.token_hash = ?`,

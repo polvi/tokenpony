@@ -5,8 +5,8 @@ import {
   discover,
   exchangeCode,
   registerClient,
-  type TppDiscovery,
-} from '@tokenpony/tpp';
+  type TpxDiscovery,
+} from '@tokenpony/tpx';
 import { chatPage, connectPage } from './ui';
 
 type AppEnv = { Bindings: Env };
@@ -47,7 +47,7 @@ function writeJsonCookie(c: Parameters<typeof setCookie>[0], name: string, value
 }
 
 /** Get (or lazily create) this app's client registration with a provider. */
-async function clientFor(env: Env, discovery: TppDiscovery): Promise<StoredClient> {
+async function clientFor(env: Env, discovery: TpxDiscovery): Promise<StoredClient> {
   const kvKey = `client:${discovery.issuer}`;
   const cached = await env.PONYCHAT_KV.get<StoredClient>(kvKey, 'json');
   if (cached) return cached;
@@ -65,7 +65,7 @@ app.onError((err, c) => {
 });
 
 app.get('/', (c) => {
-  const grant = readJsonCookie<GrantCookie>(c, 'tpp_grant');
+  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant');
   if (!grant) return c.html(connectPage(c.env.DEFAULT_ISSUER));
   return c.html(chatPage(grant.issuer, grant.budget));
 });
@@ -80,20 +80,20 @@ app.post('/connect', async (c) => {
   }
   const budget = Number(form.budget) || 100_000;
 
-  let discovery: TppDiscovery;
+  let discovery: TpxDiscovery;
   let client: StoredClient;
   try {
     discovery = await discover(issuer);
     client = await clientFor(c.env, discovery);
   } catch (err) {
     return c.html(
-      connectPage(c.env.DEFAULT_ISSUER, `${issuer} doesn't speak TPP: ${String(err)}`),
+      connectPage(c.env.DEFAULT_ISSUER, `${issuer} doesn't speak TPX: ${String(err)}`),
       502,
     );
   }
 
   const state = crypto.randomUUID();
-  writeJsonCookie(c, 'tpp_state', { state, issuer } satisfies StateCookie, 600);
+  writeJsonCookie(c, 'tpx_state', { state, issuer } satisfies StateCookie, 600);
   return c.redirect(
     buildAuthorizeUrl(discovery, {
       client_id: client.client_id,
@@ -105,8 +105,8 @@ app.post('/connect', async (c) => {
 });
 
 app.get('/callback', async (c) => {
-  const saved = readJsonCookie<StateCookie>(c, 'tpp_state');
-  deleteCookie(c, 'tpp_state', COOKIE_OPTS);
+  const saved = readJsonCookie<StateCookie>(c, 'tpx_state');
+  deleteCookie(c, 'tpx_state', COOKIE_OPTS);
   const { code, state, error } = c.req.query();
 
   if (error === 'access_denied')
@@ -125,7 +125,7 @@ app.get('/callback', async (c) => {
     });
     writeJsonCookie(
       c,
-      'tpp_grant',
+      'tpx_grant',
       {
         token: grant.access_token,
         api_base: grant.api_base,
@@ -141,13 +141,13 @@ app.get('/callback', async (c) => {
 });
 
 app.post('/disconnect', (c) => {
-  deleteCookie(c, 'tpp_grant', COOKIE_OPTS);
+  deleteCookie(c, 'tpx_grant', COOKIE_OPTS);
   return c.redirect('/');
 });
 
 // Proxy the provider's model list (grant token stays in the HttpOnly cookie).
 app.get('/models', async (c) => {
-  const grant = readJsonCookie<GrantCookie>(c, 'tpp_grant');
+  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant');
   if (!grant) return c.json({ error: { code: 'not_connected', message: 'Connect a provider' } }, 401);
   const res = await fetch(`${grant.api_base}/models`);
   return new Response(res.body, { status: res.status, headers: { 'content-type': 'application/json' } });
@@ -155,7 +155,7 @@ app.get('/models', async (c) => {
 
 // Proxy chat completions, streaming SSE straight through.
 app.post('/chat', async (c) => {
-  const grant = readJsonCookie<GrantCookie>(c, 'tpp_grant');
+  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant');
   if (!grant) return c.json({ error: { code: 'not_connected', message: 'Connect a provider' } }, 401);
   const body = await c.req.json<{ model: string; messages: unknown[] }>();
   const res = await fetch(`${grant.api_base}/chat/completions`, {

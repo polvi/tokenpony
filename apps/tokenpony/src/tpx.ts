@@ -9,11 +9,11 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 
 export function discoveryDoc(issuer: string) {
   return {
-    tpp_version: '0.1',
+    tpx_version: '0.1',
     issuer,
-    authorization_endpoint: `${issuer}/tpp/authorize`,
-    token_endpoint: `${issuer}/tpp/token`,
-    registration_endpoint: `${issuer}/tpp/register`,
+    authorization_endpoint: `${issuer}/tpx/authorize`,
+    token_endpoint: `${issuer}/tpx/token`,
+    registration_endpoint: `${issuer}/tpx/register`,
     api_base: `${issuer}/v1`,
     models_endpoint: `${issuer}/v1/models`,
   };
@@ -38,11 +38,11 @@ function validRedirect(app: AppRow, uri: string): boolean {
   return (JSON.parse(app.redirect_uris) as string[]).includes(uri);
 }
 
-export const tpp = new Hono<AppEnv>();
+export const tpx = new Hono<AppEnv>();
 
 // -- Dynamic client registration (open in the PoC) ---------------------------
 
-tpp.post('/register', async (c) => {
+tpx.post('/register', async (c) => {
   let body: { name?: string; redirect_uris?: string[] };
   try {
     body = await c.req.json();
@@ -77,7 +77,7 @@ tpp.post('/register', async (c) => {
 
 // -- Authorization + consent -------------------------------------------------
 
-tpp.get('/authorize', async (c) => {
+tpx.get('/authorize', async (c) => {
   const q = c.req.query();
   const app = q.client_id ? await loadApp(c, q.client_id) : null;
   if (!app) return jsonError(400, 'invalid_client', 'Unknown client_id');
@@ -108,11 +108,11 @@ tpp.get('/authorize', async (c) => {
      The app never sees your keys or your identity — only this metered budget.
      You can revoke it any time from your dashboard.</p>
   <div class="row" style="margin-top:1rem">
-    <form method="post" action="/tpp/decision">${hidden}
+    <form method="post" action="/tpx/decision">${hidden}
       <input type="hidden" name="decision" value="approve">
       <button type="submit">Approve ${budget.toLocaleString('en-US')} tokens</button>
     </form>
-    <form method="post" action="/tpp/decision">${hidden}
+    <form method="post" action="/tpx/decision">${hidden}
       <input type="hidden" name="decision" value="deny">
       <button type="submit" class="quiet">Deny</button>
     </form>
@@ -123,7 +123,7 @@ tpp.get('/authorize', async (c) => {
   );
 });
 
-tpp.post('/decision', async (c) => {
+tpx.post('/decision', async (c) => {
   const form = await c.req.parseBody();
   const clientId = String(form.client_id ?? '');
   const redirectUri = String(form.redirect_uri ?? '');
@@ -148,7 +148,7 @@ tpp.post('/decision', async (c) => {
     return c.redirect(dest.toString());
   }
 
-  const code = randomToken('tppc_');
+  const code = randomToken('tpxc_');
   await c.env.DB.prepare(
     'INSERT INTO auth_codes (code, client_id, user_id, budget, redirect_uri, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
   )
@@ -160,7 +160,7 @@ tpp.post('/decision', async (c) => {
 
 // -- Token exchange ----------------------------------------------------------
 
-tpp.post('/token', async (c) => {
+tpx.post('/token', async (c) => {
   let body: {
     grant_type?: string;
     code?: string;
@@ -199,7 +199,7 @@ tpp.post('/token', async (c) => {
   if (Date.parse(row.expires_at) < Date.now())
     return jsonError(400, 'invalid_grant', 'Authorization code expired');
 
-  const token = randomToken('tpp_');
+  const token = randomToken('tpx_');
   const grantId = crypto.randomUUID();
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE auth_codes SET used = 1 WHERE code = ?').bind(row.code),

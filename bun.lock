@@ -8,7 +8,7 @@
     "apps/ponychat": {
       "name": "ponychat",
       "dependencies": {
-        "@tokenpony/tpp": "workspace:*",
+        "@tokenpony/tpx": "workspace:*",
         "hono": "^4",
       },
       "devDependencies": {
@@ -19,7 +19,7 @@
     "apps/tokenpony": {
       "name": "tokenpony-api",
       "dependencies": {
-        "@tokenpony/tpp": "workspace:*",
+        "@tokenpony/tpx": "workspace:*",
         "hono": "^4",
       },
       "devDependencies": {
@@ -37,8 +37,8 @@
         "astro": "^7.1.1",
       },
     },
-    "packages/tpp": {
-      "name": "@tokenpony/tpp",
+    "packages/tpx": {
+      "name": "@tokenpony/tpx",
       "version": "0.1.0",
     },
   },
@@ -311,7 +311,7 @@
 
     "@speed-highlight/core": ["@speed-highlight/core@1.2.17", "", {}, "sha512-Z92FwKpCtfaW1V0jTU/fh3QzYEZN8wDwrzRIBoADCJfn4mJCNcJN/XegifX7BDrQ8/h9Xh/JnbyMchL0FqXrkg=="],
 
-    "@tokenpony/tpp": ["@tokenpony/tpp@workspace:packages/tpp"],
+    "@tokenpony/tpx": ["@tokenpony/tpx@workspace:packages/tpx"],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg=="],
 

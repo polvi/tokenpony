@@ -1,11 +1,11 @@
-# Token Pony Protocol (TPP) — v0.1
+# Token Pony Express (TPX) — v0.1
 
 **Status:** Draft, proof of concept. Reference implementation: [tokenpony.dev](https://tokenpony.dev).
 
-TPP is an OAuth-style authorization protocol for LLM inference tokens. It lets an application
+TPX is an OAuth-style authorization protocol for LLM inference tokens. It lets an application
 ship with **no LLM credentials of its own**: instead, the user grants the app a metered token
 budget from a **provider** the user chooses and pays. OAuth taught apps to ask for identity;
-TPP teaches them to ask for tokens.
+TPX teaches them to ask for tokens.
 
 ## 1. Roles
 
@@ -19,22 +19,22 @@ TPP teaches them to ask for tokens.
 A provider is identified by an HTTPS origin (the **issuer**). Apps resolve capabilities with:
 
 ```
-GET {issuer}/.well-known/tpp
+GET {issuer}/.well-known/tpx
 ```
 
 ```json
 {
-  "tpp_version": "0.1",
+  "tpx_version": "0.1",
   "issuer": "https://api.tokenpony.dev",
-  "authorization_endpoint": "https://api.tokenpony.dev/tpp/authorize",
-  "token_endpoint": "https://api.tokenpony.dev/tpp/token",
-  "registration_endpoint": "https://api.tokenpony.dev/tpp/register",
+  "authorization_endpoint": "https://api.tokenpony.dev/tpx/authorize",
+  "token_endpoint": "https://api.tokenpony.dev/tpx/token",
+  "registration_endpoint": "https://api.tokenpony.dev/tpx/register",
   "api_base": "https://api.tokenpony.dev/v1",
   "models_endpoint": "https://api.tokenpony.dev/v1/models"
 }
 ```
 
-Because any provider exposes the same document shape, a TPP app works with any provider the
+Because any provider exposes the same document shape, a TPX app works with any provider the
 user names — the app hard-codes nothing but the flow.
 
 ## 3. Client registration
@@ -101,7 +101,7 @@ Response:
 
 ```json
 {
-  "access_token": "tpp_…",
+  "access_token": "tpx_…",
   "token_type": "bearer",
   "budget": 100000,
   "budget_used": 0,
@@ -110,7 +110,7 @@ Response:
 ```
 
 The access token is scoped to one user + one client + one budget. It carries **no user
-identity** — TPP grants tokens, not identity. Providers store only a hash of the token.
+identity** — TPX grants tokens, not identity. Providers store only a hash of the token.
 
 ## 6. Metered inference API
 
@@ -119,7 +119,7 @@ identity** — TPP grants tokens, not identity. Providers store only a hash of t
 - `GET {api_base}/models` — available models
 - `POST {api_base}/chat/completions` — streaming (SSE) and non-streaming
 
-The app authenticates with `Authorization: Bearer tpp_…`. After each completion the provider
+The app authenticates with `Authorization: Bearer tpx_…`. After each completion the provider
 debits **actual** `prompt_tokens + completion_tokens` from the grant's remaining budget and the
 user's balance. Streaming responses report usage in the final SSE chunk.
 

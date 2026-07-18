@@ -1,14 +1,14 @@
 /**
- * @tokenpony/tpp — client SDK for the Token Pony Protocol (TPP) v0.1.
+ * @tokenpony/tpx — client SDK for the Token Pony Express (TPX) v0.1.
  *
- * TPP lets an app request a metered LLM token budget from a provider the
+ * TPX lets an app request a metered LLM token budget from a provider the
  * user chooses and pays. See https://tokenpony.dev/spec.
  */
 
-export const TPP_VERSION = '0.1';
+export const TPX_VERSION = '0.1';
 
-export interface TppDiscovery {
-  tpp_version: string;
+export interface TpxDiscovery {
+  tpx_version: string;
   issuer: string;
   authorization_endpoint: string;
   token_endpoint: string;
@@ -17,12 +17,12 @@ export interface TppDiscovery {
   models_endpoint: string;
 }
 
-export interface TppClientRegistration {
+export interface TpxClientRegistration {
   client_id: string;
   client_secret: string;
 }
 
-export interface TppGrant {
+export interface TpxGrant {
   access_token: string;
   token_type: 'bearer';
   budget: number;
@@ -30,18 +30,18 @@ export interface TppGrant {
   api_base: string;
 }
 
-export interface TppErrorBody {
+export interface TpxErrorBody {
   error: { code: string; message: string };
 }
 
-export class TppError extends Error {
+export class TpxError extends Error {
   constructor(
     public status: number,
     public code: string,
     message: string,
   ) {
     super(message);
-    this.name = 'TppError';
+    this.name = 'TpxError';
   }
 }
 
@@ -50,27 +50,27 @@ async function throwOnError(res: Response): Promise<void> {
   let code = 'unknown_error';
   let message = `${res.status} ${res.statusText}`;
   try {
-    const body = (await res.json()) as TppErrorBody;
+    const body = (await res.json()) as TpxErrorBody;
     code = body.error.code;
     message = body.error.message;
   } catch {
     // non-JSON error body; keep the status text
   }
-  throw new TppError(res.status, code, message);
+  throw new TpxError(res.status, code, message);
 }
 
 /** Resolve a provider's capabilities from its issuer origin. */
-export async function discover(issuer: string): Promise<TppDiscovery> {
-  const res = await fetch(new URL('/.well-known/tpp', issuer));
+export async function discover(issuer: string): Promise<TpxDiscovery> {
+  const res = await fetch(new URL('/.well-known/tpx', issuer));
   await throwOnError(res);
   return res.json();
 }
 
 /** One-time dynamic client registration with a provider. */
 export async function registerClient(
-  discovery: TppDiscovery,
+  discovery: TpxDiscovery,
   opts: { name: string; redirect_uris: string[] },
-): Promise<TppClientRegistration> {
+): Promise<TpxClientRegistration> {
   const res = await fetch(discovery.registration_endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -82,7 +82,7 @@ export async function registerClient(
 
 /** Build the URL to send the user to for budget approval. */
 export function buildAuthorizeUrl(
-  discovery: TppDiscovery,
+  discovery: TpxDiscovery,
   opts: { client_id: string; redirect_uri: string; state: string; budget: number },
 ): string {
   const url = new URL(discovery.authorization_endpoint);
@@ -95,9 +95,9 @@ export function buildAuthorizeUrl(
 
 /** Exchange the authorization code from the redirect for a grant. */
 export async function exchangeCode(
-  discovery: TppDiscovery,
+  discovery: TpxDiscovery,
   opts: { code: string; client_id: string; client_secret: string; redirect_uri: string },
-): Promise<TppGrant> {
+): Promise<TpxGrant> {
   const res = await fetch(discovery.token_endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -120,7 +120,7 @@ export interface ChatUsage {
 
 /**
  * Non-streaming chat completion against a provider's OpenAI-compatible API.
- * Works with both `tpp_` grant tokens and provider-native `sk_` keys.
+ * Works with both `tpx_` grant tokens and provider-native `sk_` keys.
  */
 export async function chat(
   apiBase: string,
