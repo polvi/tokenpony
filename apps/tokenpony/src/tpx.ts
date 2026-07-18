@@ -18,6 +18,7 @@ export function discoveryDoc(issuer: string) {
     registration_endpoint: `${issuer}/tpx/register`,
     api_base: `${issuer}/v1`,
     models_endpoint: `${issuer}/v1/models`,
+    documentation: 'https://tokenpony.dev/llms.txt',
   };
 }
 

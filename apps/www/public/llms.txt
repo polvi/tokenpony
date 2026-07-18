@@ -1,0 +1,129 @@
+# tokenpony / Token Pony Express (TPX) v0.1
+
+tokenpony is an LLM inference provider implementing TPX, an OAuth-style protocol where an
+application ships with NO LLM credentials of its own. The end user grants the app a metered
+credit budget from a provider the user chooses and pays. Grants are budget-capped,
+revocable, and pseudonymous (they carry no user identity).
+
+- Issuer (provider API): https://api.tokenpony.dev
+- Discovery: GET https://api.tokenpony.dev/.well-known/tpx
+- Human spec: https://tokenpony.dev/spec
+- User dashboard (passkey login): https://api.tokenpony.dev/dashboard
+- Demo TPX client app: https://ponychat.tokenpony.dev
+
+## Units
+
+All balances and budgets are CREDITS: 1 credit = US$0.000001 (so "$X per M tokens" equals
+exactly X credits per token). Users buy credits at the dashboard via Stripe; packs start at
+$1 = 1,000,000 credits. There are no free credits. Per-model prices (USD per M input /
+cached input / output tokens) are published live on the models endpoint.
+
+## Integrating an app (the TPX flow)
+
+Step 0. Discover. All shapes below generalize to any TPX issuer; hard-code the flow, not
+the vendor.
+
+    GET {issuer}/.well-known/tpx
+    -> {
+      "tpx_version": "0.1",
+      "issuer": "https://api.tokenpony.dev",
+      "authorization_endpoint": "https://api.tokenpony.dev/tpx/authorize",
+      "token_endpoint": "https://api.tokenpony.dev/tpx/token",
+      "registration_endpoint": "https://api.tokenpony.dev/tpx/register",
+      "api_base": "https://api.tokenpony.dev/v1",
+      "models_endpoint": "https://api.tokenpony.dev/v1/models",
+      "documentation": "https://tokenpony.dev/llms.txt"
+    }
+
+Step 1. Register your app once per issuer (open dynamic registration in v0.1). Store the
+secret; it is shown once and held hashed server-side.
+
+    POST {registration_endpoint}
+    Content-Type: application/json
+    { "name": "My App", "redirect_uris": ["https://myapp.example/callback"] }
+    -> { "client_id": "app_…", "client_secret": "cs_…" }
+
+    redirect_uris must be https (localhost allowed for development).
+
+Step 2. Authorize. Send the user's browser to:
+
+    {authorization_endpoint}?client_id=app_…
+      &redirect_uri=https://myapp.example/callback   (must exactly match a registered URI)
+      &state={opaque-csrf-value}                     (required; verify on return)
+      &budget={credits}                              (integer 1..10000000, i.e. up to $10)
+
+The provider authenticates the user (tokenpony uses passkeys via AuthGravity) and shows a
+consent page with your app name and the requested budget. On approval:
+
+    302 {redirect_uri}?code=tpxc_…&state={state}     (code is single-use, expires in 5 min)
+
+On denial: 302 {redirect_uri}?error=access_denied&state={state}
+
+Step 3. Exchange the code (server-side).
+
+    POST {token_endpoint}
+    Content-Type: application/json
+    {
+      "grant_type": "authorization_code",
+      "code": "tpxc_…",
+      "client_id": "app_…",
+      "client_secret": "cs_…",
+      "redirect_uri": "https://myapp.example/callback"
+    }
+    -> {
+      "access_token": "tpx_…",
+      "token_type": "bearer",
+      "budget": 100000,
+      "budget_used": 0,
+      "api_base": "https://api.tokenpony.dev/v1"
+    }
+
+Step 4. Chat on the user's credits. api_base is OpenAI-compatible; any OpenAI SDK works by
+setting baseURL={api_base} and apiKey={access_token}.
+
+    GET  {api_base}/models          (no auth required; includes live per-model pricing)
+    POST {api_base}/chat/completions
+    Authorization: Bearer tpx_…
+    { "model": "llama-3.3-70b", "messages": [{"role":"user","content":"hi"}],
+      "stream": true|false, "max_tokens": 2048, "temperature": 0.7 }
+
+Responses are standard OpenAI chat-completion shapes (SSE chunks when streaming). The
+usage block is extended with the exact charge:
+
+    "usage": {
+      "prompt_tokens": 40, "completion_tokens": 3, "total_tokens": 43,
+      "prompt_tokens_details": { "cached_tokens": 0 },
+      "credits_charged": 19
+    }
+
+In streaming responses, usage arrives in the final chunk before "data: [DONE]".
+max_tokens is automatically clamped to what the grant/balance can still afford.
+
+## Errors
+
+All errors: HTTP status + body { "error": { "code": "...", "message": "..." } }
+
+    401 invalid_token       unknown/malformed/revoked-and-purged token
+    402 budget_exhausted    grant budget spent -> run the authorize flow again for a new grant
+    402 balance_exhausted   the user's provider balance is empty -> user must top up
+    403 grant_revoked       the user revoked this grant at the provider
+    400 invalid_grant       bad/expired/reused authorization code
+    404 model_not_found     unknown model id; list {models_endpoint}
+    502 upstream_error      inference backend failure
+
+When a grant runs dry, simply start a new authorization request; the user decides whether
+to top the app up. Never ask users for provider API keys; that is what grants replace.
+
+## Personal API keys (non-TPX path)
+
+Users can mint personal keys (sk_…) in the dashboard and use them directly against
+{api_base} with any OpenAI SDK. Same metering, same error shapes.
+
+## Security notes
+
+- Always send and verify the state parameter.
+- Authorization codes are single-use with a 5-minute TTL.
+- Tokens and client secrets are stored hashed by the provider.
+- A grant is a damage cap: a leaked tpx_ token can spend at most the remaining budget and
+  is revocable by the user at any time.
+- Grants carry no user identity: no email, no name, no provider account id.

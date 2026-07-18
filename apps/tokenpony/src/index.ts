@@ -31,6 +31,7 @@ app.use('*', async (c, next) => {
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));
+app.get('/llms.txt', (c) => c.redirect('https://tokenpony.dev/llms.txt', 302));
 app.get('/.well-known/tpx', (c) => c.json(discoveryDoc(c.env.ISSUER)));
 app.route('/v1', api);
 app.route('/tpx', tpx);
