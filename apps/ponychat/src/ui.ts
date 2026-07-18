@@ -88,16 +88,16 @@ export function connectPage(defaultIssuer: string, error?: string): string {
         <input id="issuer" name="issuer" type="url" value="${esc(defaultIssuer)}" required>
       </div>
       <div class="field">
-        <label for="budget">Token budget to request</label>
+        <label for="budget">Credit budget to request (1M credits = $1)</label>
         <select id="budget" name="budget">
-          <option value="50000">50,000 tokens</option>
-          <option value="100000" selected>100,000 tokens</option>
-          <option value="500000">500,000 tokens</option>
+          <option value="50000">50,000 credits ($0.05)</option>
+          <option value="100000" selected>100,000 credits ($0.10)</option>
+          <option value="500000">500,000 credits ($0.50)</option>
         </select>
       </div>
       <button type="submit">Connect provider →</button>
     </form>
-    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and start with 100k free tokens.</p>
+    <p class="muted" style="margin-top:1rem">New here? <a href="https://tokenpony.dev">tokenpony.dev</a> is the reference provider; accounts take one passkey tap and start with free demo credits.</p>
   </div>
 </main>`,
   );
@@ -108,7 +108,7 @@ export function chatPage(issuer: string, budget: number): string {
     'Pony Chat',
     `<header class="bar">
   <span class="wordmark">Pony Chat<small>TPX DEMO</small></span>
-  <span class="meter">grant <b id="used">0</b> / ${budget.toLocaleString('en-US')} tokens · <span class="mono">${esc(new URL(issuer).host)}</span></span>
+  <span class="meter">grant <b id="used">0</b> / ${budget.toLocaleString('en-US')} credits · <span class="mono">${esc(new URL(issuer).host)}</span></span>
   <span>
     <select id="model" class="quiet"></select>
     <form method="post" action="/disconnect" style="display:inline"><button class="quiet">Disconnect</button></form>
@@ -193,7 +193,7 @@ composer.addEventListener('submit', async (e) => {
           const chunk = JSON.parse(payload);
           const delta = chunk.choices?.[0]?.delta?.content;
           if (delta) { answer += String(delta); out.textContent = answer; log.scrollTop = log.scrollHeight; }
-          if (chunk.usage) { used += chunk.usage.total_tokens; usedEl.textContent = used.toLocaleString('en-US'); }
+          if (chunk.usage) { used += chunk.usage.credits_charged ?? chunk.usage.total_tokens; usedEl.textContent = used.toLocaleString('en-US'); }
         } catch {}
       }
     }

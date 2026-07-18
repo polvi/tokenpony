@@ -5,6 +5,7 @@ import { grantTuples, writeTuples } from './authz';
 import { loginRedirect, ensureUser, whoami } from './auth';
 import type { AppEnv } from './types';
 
+// Budgets are credits (micro-USD): cap a single grant at $10.
 const MAX_BUDGET = 10_000_000;
 const CODE_TTL_MS = 5 * 60 * 1000;
 
@@ -104,14 +105,14 @@ tpx.get('/authorize', async (c) => {
 <h1>${esc(app.name)} is asking for a token budget.</h1>
 <div class="card">
   <p><strong>${esc(app.name)}</strong> wants to spend up to
-     <strong>${budget.toLocaleString('en-US')} tokens</strong> from your tokenpony balance.</p>
-  <p class="muted">Your balance: ${user.balance_tokens.toLocaleString('en-US')} tokens.
+     <strong>${budget.toLocaleString('en-US')} credits</strong> (about $${(budget / 1_000_000).toFixed(2)}) from your tokenpony balance.</p>
+  <p class="muted">Your balance: ${user.balance_credits.toLocaleString('en-US')} credits.
      The app never sees your keys or your identity, only this metered budget.
      You can revoke it any time from your dashboard.</p>
   <div class="row" style="margin-top:1rem">
     <form method="post" action="/tpx/decision">${hidden}
       <input type="hidden" name="decision" value="approve">
-      <button type="submit">Approve ${budget.toLocaleString('en-US')} tokens</button>
+      <button type="submit">Approve ${budget.toLocaleString('en-US')} credits</button>
     </form>
     <form method="post" action="/tpx/decision">${hidden}
       <input type="hidden" name="decision" value="deny">

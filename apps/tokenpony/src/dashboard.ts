@@ -4,6 +4,7 @@ import { randomToken, sha256Hex } from './util';
 import { applicationTuples, checkPermission, writeTuples } from './authz';
 import { requireSession } from './auth';
 import { PACKS } from './billing';
+import { usd } from './pricing';
 import type { AppEnv } from './types';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
@@ -31,10 +32,10 @@ dashboard.get('/', async (c) => {
       .all<{ id: string; budget_total: number; budget_used: number; status: string; created_at: string; app_name: string }>(),
     db
       .prepare(
-        'SELECT model, prompt_tokens, completion_tokens, created_at FROM usage_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 15',
+        'SELECT model, prompt_tokens, cached_tokens, completion_tokens, credits, created_at FROM usage_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 15',
       )
       .bind(user.id)
-      .all<{ model: string; prompt_tokens: number; completion_tokens: number; created_at: string }>(),
+      .all<{ model: string; prompt_tokens: number; cached_tokens: number; completion_tokens: number; credits: number; created_at: string }>(),
     db
       .prepare('SELECT client_id, name, redirect_uris, created_at FROM apps WHERE owner_user_id = ? ORDER BY created_at DESC')
       .bind(user.id)
@@ -50,11 +51,11 @@ dashboard.get('/', async (c) => {
           ([id, p]) =>
             `<form method="post" action="/billing/checkout" class="inline">
                <input type="hidden" name="pack" value="${id}">
-               <button type="submit">Buy ${fmt(p.tokens)} tokens for $${p.usd}</button>
+               <button type="submit">Buy ${fmt(p.credits)} credits for $${p.usd}</button>
              </form>`,
         )
         .join('')}</div>`
-    : `<p class="muted">Top-ups aren't configured yet (Stripe keys pending). New accounts start with 100,000 free tokens.</p>`;
+    : `<p class="muted">Top-ups aren't configured yet (Stripe keys pending). New accounts start with 250,000 free credits.</p>`;
 
   const keyRows =
     keys.results.map(
@@ -70,7 +71,7 @@ dashboard.get('/', async (c) => {
     grants.results.map(
       (g) => `<tr>
         <td>${esc(g.app_name)}</td>
-        <td>${fmt(g.budget_used)} / ${fmt(g.budget_total)}</td>
+        <td>${fmt(g.budget_used)} / ${fmt(g.budget_total)} credits</td>
         <td>${g.status}</td>
         <td>${g.status === 'active' ? `<form method="post" action="/dashboard/grants/${g.id}/revoke" class="inline"><button class="danger">Revoke</button></form>` : ''}</td>
       </tr>`,
@@ -78,8 +79,8 @@ dashboard.get('/', async (c) => {
 
   const usageRows =
     usage.results.map(
-      (u) => `<tr><td class="mono">${esc(u.model)}</td><td>${fmt(u.prompt_tokens)}</td><td>${fmt(u.completion_tokens)}</td><td class="muted">${u.created_at}Z</td></tr>`,
-    ).join('') || '<tr><td colspan="4" class="muted">No usage yet.</td></tr>';
+      (u) => `<tr><td class="mono">${esc(u.model)}</td><td>${fmt(u.prompt_tokens)}${u.cached_tokens ? ` <span class="muted">(${fmt(u.cached_tokens)} cached)</span>` : ''}</td><td>${fmt(u.completion_tokens)}</td><td>${fmt(u.credits)} <span class="muted">(${usd(u.credits)})</span></td><td class="muted">${u.created_at}Z</td></tr>`,
+    ).join('') || '<tr><td colspan="5" class="muted">No usage yet.</td></tr>';
 
   const appRows =
     apps.results.map(
@@ -89,9 +90,10 @@ dashboard.get('/', async (c) => {
   return c.html(
     page(
       'Dashboard · tokenpony',
-      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Tokens are credited when Stripe confirms; refresh in a moment.</div>' : ''}
+      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Credits land when Stripe confirms; refresh in a moment.</div>' : ''}
 <p class="eyebrow">Your account</p>
-<h1>Balance: <span class="stat">${fmt(user.balance_tokens)}</span> tokens</h1>
+<h1>Balance: <span class="stat">${fmt(user.balance_credits)}</span> credits <span class="muted" style="font-size:1.1rem">(${usd(user.balance_credits)})</span></h1>
+<p class="muted">1 credit = $0.000001. Models are metered at Cloudflare's per-token rates; see <a href="/v1/models">/v1/models</a> for live pricing.</p>
 <p class="muted mono">${esc(user.id)}</p>
 ${billing}
 
@@ -107,7 +109,7 @@ ${billing}
 </form>
 
 <h2>Recent usage</h2>
-<table><tr><th>Model</th><th>Prompt</th><th>Completion</th><th>When (UTC)</th></tr>${usageRows}</table>
+<table><tr><th>Model</th><th>Prompt tokens</th><th>Completion tokens</th><th>Credits</th><th>When (UTC)</th></tr>${usageRows}</table>
 
 <h2>Developer: your registered apps</h2>
 <table><tr><th>Name</th><th>client_id</th><th>redirect_uris</th></tr>${appRows}</table>

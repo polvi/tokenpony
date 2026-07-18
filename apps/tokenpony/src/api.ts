@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { MODELS, resolveModel, type ModelEntry } from './models';
+import { creditsFor, getPrices, priceFor, type ModelPrice, type TokenCounts } from './pricing';
 import { estimateTokens, jsonError, sha256Hex } from './util';
 import type { AppEnv } from './types';
 
@@ -17,13 +18,7 @@ interface ChatRequest {
   temperature?: number;
 }
 
-interface Usage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-}
-
-/** Who is spending: a personal key or a TPX grant. */
+/** Who is spending: a personal key or a TPX grant. Amounts are credits (micro-USD). */
 interface Spender {
   userId: string;
   balance: number;
@@ -39,21 +34,21 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
 
   if (token.startsWith('sk_')) {
     const row = await c.env.DB.prepare(
-      `SELECT k.id AS key_id, k.revoked, u.id AS user_id, u.balance_tokens
+      `SELECT k.id AS key_id, k.revoked, u.id AS user_id, u.balance_credits
        FROM api_keys k JOIN users u ON u.id = k.user_id WHERE k.key_hash = ?`,
     )
       .bind(hash)
-      .first<{ key_id: string; revoked: number; user_id: string; balance_tokens: number }>();
+      .first<{ key_id: string; revoked: number; user_id: string; balance_credits: number }>();
     if (!row) return jsonError(401, 'invalid_token', 'Unknown API key');
     if (row.revoked) return jsonError(401, 'invalid_token', 'API key revoked');
-    if (row.balance_tokens <= 0)
-      return jsonError(402, 'balance_exhausted', 'Your tokenpony balance is empty; top up at https://api.tokenpony.dev/dashboard');
-    return { userId: row.user_id, balance: row.balance_tokens, apiKeyId: row.key_id };
+    if (row.balance_credits <= 0)
+      return jsonError(402, 'balance_exhausted', 'Your tokenpony credit balance is empty; top up at https://api.tokenpony.dev/dashboard');
+    return { userId: row.user_id, balance: row.balance_credits, apiKeyId: row.key_id };
   }
 
   if (token.startsWith('tpx_')) {
     const row = await c.env.DB.prepare(
-      `SELECT g.id AS grant_id, g.status, g.budget_total, g.budget_used, u.id AS user_id, u.balance_tokens
+      `SELECT g.id AS grant_id, g.status, g.budget_total, g.budget_used, u.id AS user_id, u.balance_credits
        FROM grants g JOIN users u ON u.id = g.user_id WHERE g.token_hash = ?`,
     )
       .bind(hash)
@@ -63,7 +58,7 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
         budget_total: number;
         budget_used: number;
         user_id: string;
-        balance_tokens: number;
+        balance_credits: number;
       }>();
     if (!row) return jsonError(401, 'invalid_token', 'Unknown grant token');
     if (row.status !== 'active')
@@ -71,11 +66,11 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     const remaining = row.budget_total - row.budget_used;
     if (remaining <= 0)
       return jsonError(402, 'budget_exhausted', 'Grant budget spent; request a new authorization');
-    if (row.balance_tokens <= 0)
+    if (row.balance_credits <= 0)
       return jsonError(402, 'balance_exhausted', "The user's provider balance is empty");
     return {
       userId: row.user_id,
-      balance: row.balance_tokens,
+      balance: row.balance_credits,
       grant: { id: row.grant_id, remaining },
     };
   }
@@ -87,31 +82,33 @@ async function debit(
   c: Context<AppEnv>,
   spender: Spender,
   model: string,
-  usage: Usage,
+  counts: TokenCounts,
+  credits: number,
 ): Promise<void> {
-  const total = usage.total_tokens;
   const stmts = [
-    c.env.DB.prepare('UPDATE users SET balance_tokens = balance_tokens - ? WHERE id = ?').bind(
-      total,
+    c.env.DB.prepare('UPDATE users SET balance_credits = balance_credits - ? WHERE id = ?').bind(
+      credits,
       spender.userId,
     ),
     c.env.DB.prepare(
-      `INSERT INTO usage_events (id, user_id, grant_id, api_key_id, model, prompt_tokens, completion_tokens)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO usage_events (id, user_id, grant_id, api_key_id, model, prompt_tokens, cached_tokens, completion_tokens, credits)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       crypto.randomUUID(),
       spender.userId,
       spender.grant?.id ?? null,
       spender.apiKeyId ?? null,
       model,
-      usage.prompt_tokens,
-      usage.completion_tokens,
+      counts.prompt_tokens,
+      counts.cached_tokens,
+      counts.completion_tokens,
+      credits,
     ),
   ];
   if (spender.grant) {
     stmts.push(
       c.env.DB.prepare('UPDATE grants SET budget_used = budget_used + ? WHERE id = ?').bind(
-        total,
+        credits,
         spender.grant.id,
       ),
     );
@@ -119,11 +116,30 @@ async function debit(
   await c.env.DB.batch(stmts);
 }
 
-function normalizeUsage(raw: unknown, prompt: string, completion: string): Usage {
-  const u = raw as Partial<Usage> | undefined;
-  const prompt_tokens = u?.prompt_tokens ?? estimateTokens(prompt);
-  const completion_tokens = u?.completion_tokens ?? estimateTokens(completion);
-  return { prompt_tokens, completion_tokens, total_tokens: prompt_tokens + completion_tokens };
+interface RawUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+  cached_tokens?: number;
+}
+
+function normalizeCounts(raw: unknown, prompt: string, completion: string): TokenCounts {
+  const u = (raw ?? {}) as RawUsage;
+  const prompt_tokens = u.prompt_tokens ?? estimateTokens(prompt);
+  const completion_tokens = u.completion_tokens ?? estimateTokens(completion);
+  const cached_tokens = u.prompt_tokens_details?.cached_tokens ?? u.cached_tokens ?? 0;
+  return { prompt_tokens, cached_tokens, completion_tokens };
+}
+
+/** OpenAI-compatible usage block, extended with tokenpony's credit charge. */
+function usageBlock(counts: TokenCounts, credits: number) {
+  return {
+    prompt_tokens: counts.prompt_tokens,
+    completion_tokens: counts.completion_tokens,
+    total_tokens: counts.prompt_tokens + counts.completion_tokens,
+    prompt_tokens_details: { cached_tokens: counts.cached_tokens },
+    credits_charged: credits,
+  };
 }
 
 /** Convert chat messages to the Responses-API input used by gpt-oss models. */
@@ -152,21 +168,11 @@ function fromResponsesOutput(result: Record<string, unknown>): string {
     .join('');
 }
 
-function completionEnvelope(model: string, content: string, usage: Usage) {
-  return {
-    id: `chatcmpl-${crypto.randomUUID()}`,
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [
-      {
-        index: 0,
-        message: { role: 'assistant', content },
-        finish_reason: 'stop',
-      },
-    ],
-    usage,
-  };
+/** Pull assistant text from either Workers AI ({response}) or OpenAI ({choices}) shapes. */
+function chatContent(result: Record<string, unknown>): string {
+  if (typeof result.response === 'string') return result.response;
+  const choices = result.choices as { message?: { content?: string } }[] | undefined;
+  return choices?.[0]?.message?.content ?? String(result.response ?? '');
 }
 
 function sseChunk(model: string, id: string, delta: Record<string, unknown>, extra?: Record<string, unknown>) {
@@ -182,17 +188,26 @@ function sseChunk(model: string, id: string, delta: Record<string, unknown>, ext
 
 export const api = new Hono<AppEnv>();
 
-api.get('/models', (c) =>
-  c.json({
+api.get('/models', async (c) => {
+  const prices = await getPrices(c.env);
+  return c.json({
     object: 'list',
-    data: MODELS.map((m) => ({
-      id: m.id,
-      object: 'model',
-      owned_by: m.owned_by,
-      description: m.description,
-    })),
-  }),
-);
+    data: await Promise.all(
+      MODELS.map(async (m) => ({
+        id: m.id,
+        object: 'model',
+        owned_by: m.owned_by,
+        description: m.description,
+        pricing: await priceFor(c.env, m.cf).then((p) => ({
+          usd_per_m_input_tokens: p.inputPerM,
+          usd_per_m_cached_input_tokens: p.cachedInputPerM,
+          usd_per_m_output_tokens: p.outputPerM,
+          source: prices[m.cf] ? 'cloudflare_catalog' : 'static',
+        })),
+      })),
+    ),
+  });
+});
 
 api.post('/chat/completions', async (c) => {
   const spender = await authenticate(c);
@@ -211,17 +226,17 @@ api.post('/chat/completions', async (c) => {
   if (!model)
     return jsonError(404, 'model_not_found', `Unknown model '${body.model}'; see /v1/models`);
 
-  // Cap completion size to what the spender can still afford (grant budget or balance).
-  const affordable = Math.min(
-    spender.grant?.remaining ?? Infinity,
-    spender.balance,
-    body.max_tokens ?? 2048,
-  );
-  const maxTokens = Math.max(64, Math.min(affordable, 4096));
+  const price = await priceFor(c.env, model.cf);
+
+  // Cap the completion to what the spender can still afford at this model's
+  // output rate (credits per token equals USD per M tokens).
+  const affordableCredits = Math.min(spender.grant?.remaining ?? Infinity, spender.balance);
+  const affordableOutput = Math.floor(affordableCredits / price.outputPerM);
+  const maxTokens = Math.max(16, Math.min(body.max_tokens ?? 2048, affordableOutput, 8192));
   const promptText = body.messages.map((m) => m.content).join('\n');
 
   if (body.stream) {
-    return streamCompletion(c, spender, model, body, maxTokens, promptText);
+    return streamCompletion(c, spender, model, price, body, maxTokens, promptText);
   }
 
   const aiInput =
@@ -244,17 +259,25 @@ api.post('/chat/completions', async (c) => {
     return jsonError(502, 'upstream_error', `Inference failed: ${String(err)}`);
   }
 
-  const content =
-    model.api === 'chat' ? String(result.response ?? '') : fromResponsesOutput(result);
-  const usage = normalizeUsage(result.usage, promptText, content);
-  await debit(c, spender, model.id, usage);
-  return c.json(completionEnvelope(model.id, content, usage));
+  const content = model.api === 'chat' ? chatContent(result) : fromResponsesOutput(result);
+  const counts = normalizeCounts(result.usage, promptText, content);
+  const credits = creditsFor(price, counts);
+  await debit(c, spender, model.id, counts, credits);
+  return c.json({
+    id: `chatcmpl-${crypto.randomUUID()}`,
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: model.id,
+    choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+    usage: usageBlock(counts, credits),
+  });
 });
 
 async function streamCompletion(
   c: Context<AppEnv>,
   spender: Spender,
   model: ModelEntry,
+  price: ModelPrice,
   body: ChatRequest,
   maxTokens: number,
   promptText: string,
@@ -277,7 +300,7 @@ async function streamCompletion(
 
   const id = `chatcmpl-${crypto.randomUUID()}`;
   let completionText = '';
-  let reportedUsage: Partial<Usage> | undefined;
+  let reportedUsage: unknown;
   let settled = false;
   let settle!: () => void;
   const done = new Promise<void>((resolve) => {
@@ -304,10 +327,12 @@ async function streamCompletion(
         if (payload === '[DONE]') continue;
         try {
           const chunk = JSON.parse(payload) as Record<string, unknown>;
-          if (chunk.usage) reportedUsage = chunk.usage as Partial<Usage>;
+          if (chunk.usage) reportedUsage = chunk.usage;
+          const openaiDelta = (chunk.choices as { delta?: { content?: unknown } }[] | undefined)?.[0]
+            ?.delta?.content;
           const rawDelta =
             model.api === 'chat'
-              ? chunk.response
+              ? (chunk.response ?? openaiDelta)
               : chunk.type === 'response.output_text.delta'
                 ? chunk.delta
                 : undefined;
@@ -323,7 +348,8 @@ async function streamCompletion(
       }
     },
     flush(controller) {
-      const usage = normalizeUsage(reportedUsage, promptText, completionText);
+      const counts = normalizeCounts(reportedUsage, promptText, completionText);
+      const credits = creditsFor(price, counts);
       controller.enqueue(
         `data: ${JSON.stringify({
           id,
@@ -331,7 +357,7 @@ async function streamCompletion(
           created: Math.floor(Date.now() / 1000),
           model: model.id,
           choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-          usage,
+          usage: usageBlock(counts, credits),
         })}\n\ndata: [DONE]\n\n`,
       );
       settle();
@@ -340,9 +366,10 @@ async function streamCompletion(
 
   // Meter after the stream finishes; usage is known only at flush time.
   c.executionCtx.waitUntil(
-    done.then(() =>
-      debit(c, spender, model.id, normalizeUsage(reportedUsage, promptText, completionText)),
-    ),
+    done.then(() => {
+      const counts = normalizeCounts(reportedUsage, promptText, completionText);
+      return debit(c, spender, model.id, counts, creditsFor(price, counts));
+    }),
   );
 
   const readable = upstream

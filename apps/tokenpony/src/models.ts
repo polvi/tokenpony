@@ -11,6 +11,13 @@ export interface ModelEntry {
 
 export const MODELS: ModelEntry[] = [
   {
+    id: 'kimi-k3',
+    cf: 'moonshotai/kimi-k3',
+    api: 'chat',
+    owned_by: 'moonshotai',
+    description: 'Kimi K3, Moonshot flagship 2.8T, 1M context, partner-served',
+  },
+  {
     id: 'llama-3.3-70b',
     cf: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     api: 'chat',

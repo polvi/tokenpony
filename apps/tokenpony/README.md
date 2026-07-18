@@ -45,3 +45,16 @@ bunx wrangler d1 migrations apply tokenpony --remote
 bun install          # repo root
 bunx wrangler deploy # from this directory
 ```
+
+## Metering
+
+Balances, grant budgets, and pack sizes are denominated in **credits**: 1 credit =
+US$0.000001, so a model's "$X per M tokens" rate is exactly X credits per token. Each
+completion is priced from actual usage (fresh input, cached input, and output tokens) at
+per-model rates pulled live from the Workers AI catalog via `env.AI.models()` (cached 6h per
+isolate, `src/pricing.ts`), with static fallbacks for models the catalog doesn't report.
+`usage.credits_charged` is returned on every completion and recorded in `usage_events`.
+
+`moonshotai/kimi-k3` ($3.00/M input, $0.30/M cached input, $15.00/M output) is a
+partner-catalog model billed through AI Gateway Unified Billing; it returns an upstream
+error until Unified Billing is enabled on the Cloudflare account in the dashboard.

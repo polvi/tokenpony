@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 
 const models = [
+  { id: 'kimi-k3', maker: 'Moonshot AI', denom: '2.8T', note: 'partner-served · 1M context' },
   { id: 'llama-3.3-70b', maker: 'Meta', denom: '70B', note: 'fast fp8 serving' },
   { id: 'gpt-oss-120b', maker: 'OpenAI', denom: '120B', note: 'open-weight reasoning' },
   { id: 'qwen2.5-coder-32b', maker: 'Alibaba', denom: '32B', note: 'tuned for code' },
@@ -136,8 +137,9 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
         <p class="eyebrow">The stable</p>
         <h2>Open-weight models only.</h2>
         <p class="section-lede">
-          Served from Cloudflare Workers AI. Every model here has published weights; any
-          provider can run them, so no app built on TPX is locked to us.
+          Served from Cloudflare Workers AI and metered at Cloudflare's live per-token rates.
+          Nearly every model here has published weights; Kimi K3 rides in as a partner-served
+          frontier model.
         </p>
         <ul class="stamp-sheet">
           {

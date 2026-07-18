@@ -3,9 +3,10 @@ import { jsonError } from './util';
 import { requireSession } from './auth';
 import type { AppEnv } from './types';
 
-export const PACKS: Record<string, { usd: number; tokens: number }> = {
-  saddlebag: { usd: 5, tokens: 5_000_000 },
-  wagon: { usd: 20, tokens: 25_000_000 },
+// Credits are micro-USD: the $5 pack is at par, the $20 pack carries a bonus.
+export const PACKS: Record<string, { usd: number; credits: number }> = {
+  saddlebag: { usd: 5, credits: 5_000_000 },
+  wagon: { usd: 20, credits: 25_000_000 },
 };
 
 export const billing = new Hono<AppEnv>();
@@ -25,9 +26,9 @@ billing.post('/checkout', requireSession, async (c) => {
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'usd',
     'line_items[0][price_data][unit_amount]': String(pack.usd * 100),
-    'line_items[0][price_data][product_data][name]': `tokenpony: ${pack.tokens.toLocaleString('en-US')} tokens`,
+    'line_items[0][price_data][product_data][name]': `tokenpony: ${pack.credits.toLocaleString('en-US')} credits`,
     'metadata[user_id]': user.id,
-    'metadata[tokens]': String(pack.tokens),
+    'metadata[credits]': String(pack.credits),
   });
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
@@ -43,9 +44,9 @@ billing.post('/checkout', requireSession, async (c) => {
     return jsonError(502, 'billing_error', session.error?.message ?? 'Stripe checkout failed');
   }
   await c.env.DB.prepare(
-    'INSERT INTO payments (id, stripe_session_id, user_id, tokens) VALUES (?, ?, ?, ?)',
+    'INSERT INTO payments (id, stripe_session_id, user_id, credits) VALUES (?, ?, ?, ?)',
   )
-    .bind(crypto.randomUUID(), session.id, user.id, pack.tokens)
+    .bind(crypto.randomUUID(), session.id, user.id, pack.credits)
     .run();
   return c.redirect(session.url);
 });
@@ -93,20 +94,20 @@ billing.post('/webhook', async (c) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const payment = await c.env.DB.prepare(
-      "SELECT id, user_id, tokens, status FROM payments WHERE stripe_session_id = ?",
+      "SELECT id, user_id, credits, status FROM payments WHERE stripe_session_id = ?",
     )
       .bind(session.id)
-      .first<{ id: string; user_id: string; tokens: number; status: string }>();
+      .first<{ id: string; user_id: string; credits: number; status: string }>();
     if (payment && payment.status !== 'paid') {
       await c.env.DB.batch([
         c.env.DB.prepare("UPDATE payments SET status = 'paid' WHERE id = ?").bind(payment.id),
-        c.env.DB.prepare('UPDATE users SET balance_tokens = balance_tokens + ? WHERE id = ?').bind(
-          payment.tokens,
+        c.env.DB.prepare('UPDATE users SET balance_credits = balance_credits + ? WHERE id = ?').bind(
+          payment.credits,
           payment.user_id,
         ),
       ]);
       console.log(
-        JSON.stringify({ event: 'payment_credited', user: payment.user_id, tokens: payment.tokens }),
+        JSON.stringify({ event: 'payment_credited', user: payment.user_id, credits: payment.credits }),
       );
     }
   }

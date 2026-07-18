@@ -69,7 +69,8 @@ GET {authorization_endpoint}
 ```
 
 - `redirect_uri` MUST exactly match one registered for the client.
-- `budget` is the requested grant size in tokens (a damage cap, not a payment).
+- `budget` is the requested grant size in provider credits (a damage cap, not a payment).
+  tokenpony denominates 1 credit = US$0.000001, so `budget=100000` caps spend at $0.10.
 - The provider authenticates the user (tokenpony uses passkeys via AuthGravity) and renders a
   consent page showing the app name and requested budget. The user may approve or deny.
 
@@ -120,8 +121,10 @@ identity**; TPX grants tokens, not identity. Providers store only a hash of the 
 - `POST {api_base}/chat/completions`: streaming (SSE) and non-streaming
 
 The app authenticates with `Authorization: Bearer tpx_…`. After each completion the provider
-debits **actual** `prompt_tokens + completion_tokens` from the grant's remaining budget and the
-user's balance. Streaming responses report usage in the final SSE chunk.
+prices **actual** usage (fresh input, cached input, and output tokens at the model's published
+per-token rates) and debits that cost, in credits, from the grant's remaining budget and the
+user's balance. The response `usage` block carries a `credits_charged` extension, and streaming
+responses report usage in the final SSE chunk. Per-model rates are listed on `{models_endpoint}`.
 
 ### Errors
 
