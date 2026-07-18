@@ -36,18 +36,18 @@ const steps = [
 
 <Layout
   title="tokenpony: bring your own tokens to any LLM app"
-  description="tokenpony is an LLM proxy for Cloudflare's open-weight models and the first provider to speak TPX, an OAuth-style protocol where apps ship without API keys and users bring their own token budget."
+  description="tokenpony is the home of TPX, an OAuth-style protocol where apps ship without API keys and users bring their own token budget, and the reference provider that implements it end to end."
 >
   <main>
     <section class="hero wrap">
       <div class="hero-copy">
-        <p class="eyebrow">TPX v0.1 · proof of concept</p>
+        <p class="eyebrow">TPX v0.1 · protocol + reference provider · proof of concept</p>
         <h1>Bring your own tokens to any LLM&nbsp;app.</h1>
         <p class="lede">
-          tokenpony is an LLM proxy for Cloudflare’s open-weight models, and the first provider
-          to speak <strong>TPX</strong>, an OAuth-style protocol where apps ship without API keys
-          and you pay a token provider you choose. The app gets a metered budget. You keep the
-          reins.
+          tokenpony is two things: the home of <strong>TPX</strong>, an OAuth-style protocol
+          where apps ship without API keys and you pay a token provider you choose, and the
+          reference provider that implements it end to end. The app gets a metered budget. You
+          keep the reins.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
@@ -139,11 +139,12 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
     <section id="models" class="stable">
       <div class="wrap">
         <p class="eyebrow">The stable</p>
-        <h2>Open-weight models only.</h2>
+        <h2>What this provider serves.</h2>
         <p class="section-lede">
-          Served from Cloudflare Workers AI and metered at Cloudflare's live per-token rates.
-          Every model here has published weights; any provider can run them, so no app built
-          on TPX is locked to us.
+          Under the hood, tokenpony runs open-weight models on Cloudflare Workers AI, metered
+          at live per-token rates. That's this provider's implementation choice, not part of
+          TPX: any provider can serve any models. Published weights just mean no app built on
+          TPX is hitched to us.
         </p>
         <ul class="stamp-sheet">
           {
