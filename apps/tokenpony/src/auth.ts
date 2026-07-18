@@ -1,4 +1,5 @@
 import type { Context, MiddlewareHandler } from 'hono';
+import { accountTuples, writeTuples } from './authz';
 import type { AppEnv } from './types';
 
 export interface SessionUser {
@@ -23,9 +24,14 @@ export async function whoami(c: Context<AppEnv>): Promise<string | null> {
 }
 
 export async function ensureUser(c: Context<AppEnv>, userId: string): Promise<SessionUser> {
-  await c.env.DB.prepare('INSERT OR IGNORE INTO users (id, balance_tokens) VALUES (?, ?)')
+  const inserted = await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO users (id, balance_tokens) VALUES (?, ?)',
+  )
     .bind(userId, STARTER_BALANCE)
     .run();
+  if (inserted.meta.changes > 0) {
+    c.executionCtx.waitUntil(writeTuples(c.env, accountTuples(userId)));
+  }
   const user = await c.env.DB.prepare('SELECT id, balance_tokens FROM users WHERE id = ?')
     .bind(userId)
     .first<SessionUser>();

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { esc, page } from './html';
 import { randomToken, sha256Hex } from './util';
+import { applicationTuples, checkPermission, writeTuples } from './authz';
 import { requireSession } from './auth';
 import { PACKS } from './billing';
 import type { AppEnv } from './types';
@@ -151,8 +152,15 @@ dashboard.post('/keys/:id/revoke', async (c) => {
 });
 
 dashboard.post('/grants/:id/revoke', async (c) => {
+  const grantId = c.req.param('id');
+  // Ask AuthGravity's relationship graph first; fall back to the local
+  // ownership guard in the UPDATE when authz can't answer.
+  const allowed = await checkPermission(c, `grant:${grantId}`, 'revoke');
+  if (allowed === false) {
+    return c.html(page('Not allowed — tokenpony', '<h1>You cannot revoke this grant.</h1><p><a href="/dashboard">Back</a></p>'), 403);
+  }
   await c.env.DB.prepare("UPDATE grants SET status = 'revoked' WHERE id = ? AND user_id = ?")
-    .bind(c.req.param('id'), c.get('user').id)
+    .bind(grantId, c.get('user').id)
     .run();
   return c.redirect('/dashboard');
 });
@@ -177,6 +185,7 @@ dashboard.post('/apps', async (c) => {
   )
     .bind(clientId, await sha256Hex(clientSecret), name, JSON.stringify([redirectUri]), user.id)
     .run();
+  c.executionCtx.waitUntil(writeTuples(c.env, applicationTuples(clientId, user.id)));
   return c.html(
     page(
       'App registered — tokenpony',

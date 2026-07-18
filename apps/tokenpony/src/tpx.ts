@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { esc, page } from './html';
 import { digestsEqual, jsonError, randomToken, sha256Hex } from './util';
+import { grantTuples, writeTuples } from './authz';
 import { loginRedirect, ensureUser, whoami } from './auth';
 import type { AppEnv } from './types';
 
@@ -207,6 +208,7 @@ tpx.post('/token', async (c) => {
       'INSERT INTO grants (id, token_hash, client_id, user_id, budget_total) VALUES (?, ?, ?, ?, ?)',
     ).bind(grantId, await sha256Hex(token), row.client_id, row.user_id, row.budget),
   ]);
+  c.executionCtx.waitUntil(writeTuples(c.env, grantTuples(grantId, row.user_id, row.client_id)));
 
   return c.json({
     access_token: token,
