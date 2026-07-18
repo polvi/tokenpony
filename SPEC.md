@@ -1,4 +1,4 @@
-# Token Pony Express (TPX) — v0.1
+# Token Pony Express (TPX) v0.1
 
 **Status:** Draft, proof of concept. Reference implementation: [tokenpony.dev](https://tokenpony.dev).
 
@@ -9,9 +9,9 @@ TPX teaches them to ask for tokens.
 
 ## 1. Roles
 
-- **User** — holds a token balance with a provider and approves grants.
-- **App (client)** — an LLM application. Never holds provider keys; holds per-user grants.
-- **Provider** — sells tokens to users, serves an OpenAI-compatible inference API, and meters
+- **User**: holds a token balance with a provider and approves grants.
+- **App (client)**: an LLM application. Never holds provider keys; holds per-user grants.
+- **Provider**: sells tokens to users, serves an OpenAI-compatible inference API, and meters
   usage against grants. tokenpony is the reference provider.
 
 ## 2. Discovery
@@ -35,7 +35,7 @@ GET {issuer}/.well-known/tpx
 ```
 
 Because any provider exposes the same document shape, a TPX app works with any provider the
-user names — the app hard-codes nothing but the flow.
+user names; the app hard-codes nothing but the flow.
 
 ## 3. Client registration
 
@@ -110,14 +110,14 @@ Response:
 ```
 
 The access token is scoped to one user + one client + one budget. It carries **no user
-identity** — TPX grants tokens, not identity. Providers store only a hash of the token.
+identity**; TPX grants tokens, not identity. Providers store only a hash of the token.
 
 ## 6. Metered inference API
 
 `api_base` is an OpenAI-compatible surface. v0.1 requires:
 
-- `GET {api_base}/models` — available models
-- `POST {api_base}/chat/completions` — streaming (SSE) and non-streaming
+- `GET {api_base}/models`: available models
+- `POST {api_base}/chat/completions`: streaming (SSE) and non-streaming
 
 The app authenticates with `Authorization: Bearer tpx_…`. After each completion the provider
 debits **actual** `prompt_tokens + completion_tokens` from the grant's remaining budget and the
@@ -128,13 +128,13 @@ user's balance. Streaming responses report usage in the final SSE chunk.
 | Status | `error.code`       | Meaning                                        |
 | ------ | ------------------ | ---------------------------------------------- |
 | 401    | `invalid_token`    | Unknown, malformed, or revoked-and-purged token |
-| 402    | `budget_exhausted` | Grant budget spent — re-authorize for more     |
+| 402    | `budget_exhausted` | Grant budget spent; re-authorize for more      |
 | 402    | `balance_exhausted`| User's provider balance is empty               |
 | 403    | `grant_revoked`    | User revoked this grant                        |
 
 Error body shape: `{ "error": { "code": "budget_exhausted", "message": "…" } }`.
 
-When a grant runs dry the app simply starts a new authorization request — the user decides
+When a grant runs dry the app simply starts a new authorization request; the user decides
 whether to top up the app.
 
 ## 7. Revocation
@@ -149,5 +149,5 @@ effect immediately; subsequent API calls fail with `403 grant_revoked`.
 - Access tokens and client secrets are stored hashed at the provider.
 - The budget is a hard damage cap: a leaked grant token can spend at most the remaining
   budget, and the user can revoke it at any time.
-- Grants are pseudonymous: the app learns nothing about the user from the token — no email,
+- Grants are pseudonymous: the app learns nothing about the user from the token: no email,
   no name, no provider account id.
