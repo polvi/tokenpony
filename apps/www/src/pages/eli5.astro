@@ -1,0 +1,157 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const qa = [
+  {
+    q: 'What in tarnation is a token?',
+    a: 'Tokens are the hay that AI horses run on. Every word you send gets chopped into bite-size pieces (those are tokens), the AI chews on them, and writes back more tokens. Every bite costs a smidgen of real money, fractions of a penny.',
+  },
+  {
+    q: "So what's the trouble?",
+    a: "Today every app buys its own hay and sells it back to you inside yet another monthly subscription. Ten apps, ten subscriptions, and you're paying for a lot of hay you never feed to anybody. Enough to make you back out of the rodeo entirely.",
+  },
+  {
+    q: 'What does tokenpony do about it?',
+    a: "It's your own hay barn. Put a dollar or two in it once. When an app wants to work for you, it moseys over and asks for a feed bag, say ten cents' worth. You approve it with one tap, no password, no email. The app can never spend more than what's in the bag, and when it's empty, it has to come ask again.",
+  },
+  {
+    q: 'Why should I care?',
+    a: "One barn instead of ten subscriptions. No app can run off with your wallet; a feed bag is the most it can ever spend, and you can yank it back any time. And you're not hitched to anyone's wagon: any provider that speaks the same protocol can hold your hay. Straight from the horse's mouth.",
+  },
+  {
+    q: 'What do I actually do?',
+    a: "Mosey over to Pony Chat, tap Connect provider, make a tokenpony account with a passkey (that's the fingerprint-or-face thing your phone already does), put a dollar in the barn, and approve the feed bag. Then chat away. Your dashboard shows the barn, every bag you've handed out, and a button to take any of them back.",
+  },
+  {
+    q: 'Is this a crypto thing?',
+    a: "Nope, not by a country mile. Credits are plain prepaid dollars and cents, bought with a regular card. No coins, no wallets, no tumbleweed-covered whitepapers. 'Token' is just the word AI folks use for a piece of a word.",
+  },
+];
+---
+
+<Layout
+  title="The campfire version · tokenpony ELI5"
+  description="tokenpony explained like you're five, with western flavor: tokens are hay, apps ask for feed bags, and you keep the barn."
+>
+  <main class="campfire">
+    <div class="wrap">
+      <p class="eyebrow">Plain talk · no jargon, partner · ELI5</p>
+      <h1>The campfire version.</h1>
+      <p class="lede">
+        Never touched a token in your life? Pull up a log. Here's the whole thing in horse
+        sense, explained like you're five.
+      </p>
+      <div class="campfire-grid">
+        {
+          qa.map((item) => (
+            <article>
+              <h2>{item.q}</h2>
+              <p>{item.a}</p>
+            </article>
+          ))
+        }
+      </div>
+      <div class="trail-out">
+        <a class="btn btn-primary" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
+        <a class="btn btn-ghost" href="/">Back to the homestead</a>
+      </div>
+      <p class="muted sign-off">
+        That's the whole show. Technical folks can mosey over to the <a href="/spec">spec</a>.
+      </p>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .campfire {
+    background: var(--panel);
+    padding-block: clamp(2.5rem, 7vw, 5rem);
+  }
+
+  h1 {
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    margin-block: 0.75rem 1rem;
+  }
+
+  .lede {
+    font-size: 1.1rem;
+    color: var(--muted);
+    max-width: 52ch;
+  }
+
+  .campfire-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin-top: 2.25rem;
+  }
+
+  .campfire-grid article {
+    background: var(--card);
+    border: 1.5px solid var(--ink);
+    border-radius: 6px;
+    padding: 1.4rem 1.5rem;
+    box-shadow: 3px 3px 0 var(--rule);
+  }
+
+  .campfire-grid h2 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--red);
+  }
+
+  .campfire-grid p {
+    color: var(--muted);
+    font-size: 0.97rem;
+  }
+
+  .trail-out {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 2.25rem;
+  }
+
+  .btn {
+    font-weight: 600;
+    text-decoration: none;
+    padding: 0.75rem 1.4rem;
+    border-radius: 4px;
+  }
+
+  .btn-primary {
+    background: var(--blue);
+    color: var(--paper);
+    border: 2px solid var(--blue-deep);
+    box-shadow: 3px 3px 0 var(--blue-deep);
+  }
+
+  .btn-primary:hover {
+    translate: 1px 1px;
+    box-shadow: 2px 2px 0 var(--blue-deep);
+  }
+
+  .btn-ghost {
+    color: var(--ink);
+    border: 2px solid var(--ink);
+  }
+
+  .btn-ghost:hover {
+    background: var(--paper);
+  }
+
+  .sign-off {
+    margin-top: 1.5rem;
+    font-style: italic;
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+
+  @media (max-width: 56rem) {
+    .campfire-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
