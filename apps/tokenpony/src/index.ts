@@ -3,8 +3,9 @@ import { api } from './api';
 import { oauth, authorizationServerMetadata, protectedResourceMetadata } from './oauth';
 import { dashboard } from './dashboard';
 import { billing } from './billing';
+import { sweepExpired } from './sweeper';
 import { jsonError } from './util';
-import type { AppEnv } from './types';
+import type { AppEnv, Bindings } from './types';
 
 const app = new Hono<AppEnv>();
 
@@ -49,4 +50,11 @@ app.route('/billing', billing);
 
 app.notFound((c) => jsonError(404, 'not_found', `No route for ${c.req.method} ${c.req.path}`));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Cron-triggered sweep of expired PAR requests, access tokens, spent auth
+  // codes, and long-dead rotated refresh tokens.
+  async scheduled(_event: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(sweepExpired(env));
+  },
+} satisfies ExportedHandler<Bindings>;

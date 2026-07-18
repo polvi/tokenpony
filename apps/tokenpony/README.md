@@ -72,3 +72,10 @@ charged exactly at cost; every later top-off nets one US Forever stamp of margin
 USPS changes the rate. Caveat: international cards cost Stripe more (+1.5%); the
 pass-through uses domestic rates, so foreign-card top-offs can dip slightly below
 cost.
+
+## Housekeeping
+
+A cron trigger (`17 * * * *`, `src/sweeper.ts`) sweeps expired ephemeral OAuth rows:
+PAR requests and access tokens past their stored expiry, auth codes older than an hour
+(or spent and expired), and rotated/revoked refresh tokens older than seven days (kept
+that long so reuse stays detectable). Live grants are never touched.
