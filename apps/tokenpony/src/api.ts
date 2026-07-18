@@ -175,6 +175,15 @@ function chatContent(result: Record<string, unknown>): string {
   return choices?.[0]?.message?.content ?? String(result.response ?? '');
 }
 
+/**
+ * Partner-catalog models (no @cf/ prefix) bill via AI Gateway Unified
+ * Billing and must be routed through a gateway; @cf models run direct.
+ */
+function gatewayOptions(c: Context<AppEnv>, model: ModelEntry) {
+  if (model.cf.startsWith('@cf/')) return undefined;
+  return { gateway: { id: c.env.AI_GATEWAY_ID } } as never;
+}
+
 function sseChunk(model: string, id: string, delta: Record<string, unknown>, extra?: Record<string, unknown>) {
   return `data: ${JSON.stringify({
     id,
@@ -250,10 +259,11 @@ api.post('/chat/completions', async (c) => {
 
   let result: Record<string, unknown>;
   try {
-    result = (await c.env.AI.run(model.cf as Parameters<Ai['run']>[0], aiInput as never)) as Record<
-      string,
-      unknown
-    >;
+    result = (await c.env.AI.run(
+      model.cf as Parameters<Ai['run']>[0],
+      aiInput as never,
+      gatewayOptions(c, model),
+    )) as Record<string, unknown>;
   } catch (err) {
     console.log(JSON.stringify({ event: 'ai_error', model: model.cf, error: String(err) }));
     return jsonError(502, 'upstream_error', `Inference failed: ${String(err)}`);
@@ -292,6 +302,7 @@ async function streamCompletion(
     upstream = (await c.env.AI.run(
       model.cf as Parameters<Ai['run']>[0],
       aiInput as never,
+      gatewayOptions(c, model),
     )) as unknown as ReadableStream;
   } catch (err) {
     console.log(JSON.stringify({ event: 'ai_error', model: model.cf, error: String(err) }));

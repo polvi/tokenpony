@@ -2,7 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 
 const models = [
-  { id: 'kimi-k3', maker: 'Moonshot AI', denom: '2.8T', note: 'partner-served · 1M context' },
+  { id: 'kimi-k2.7-code', maker: 'Moonshot AI', denom: '1T', note: 'code + agents · 262k context' },
   { id: 'llama-3.3-70b', maker: 'Meta', denom: '70B', note: 'fast fp8 serving' },
   { id: 'gpt-oss-120b', maker: 'OpenAI', denom: '120B', note: 'open-weight reasoning' },
   { id: 'qwen2.5-coder-32b', maker: 'Alibaba', denom: '32B', note: 'tuned for code' },
@@ -138,8 +138,8 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
         <h2>Open-weight models only.</h2>
         <p class="section-lede">
           Served from Cloudflare Workers AI and metered at Cloudflare's live per-token rates.
-          Nearly every model here has published weights; Kimi K3 rides in as a partner-served
-          frontier model.
+          Every model here has published weights; any provider can run them, so no app built
+          on TPX is locked to us.
         </p>
         <ul class="stamp-sheet">
           {
@@ -162,18 +162,20 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
       <h2>Where TPX is new, and where it isn’t.</h2>
       <p class="section-lede">
         Every piece of this exists somewhere. The OpenAI and Anthropic APIs settled what an
-        inference API looks like. OpenRouter proved one API can front many models. “Bring your
-        own key” apps proved users will pay for their own inference. And OAuth is fifteen years
-        old. TPX’s only claim is the combination: OAuth’s <em>consent-and-scope</em> shape
-        applied to <em>token budgets</em>, behind a discovery document any provider can serve.
+        inference API looks like. OpenRouter proved one API can front many models, and its
+        account-connect flow proved users will fund apps from a shared balance. Vendor sign-in
+        programs bill approved apps to a subscription. And OAuth is fifteen years old. TPX’s
+        claim is narrower: budget-scoped, pseudonymous grants that <em>any</em> provider can
+        issue, behind a discovery document instead of a company.
       </p>
       <div class="table-scroll">
         <table class="tariff">
           <thead>
             <tr>
               <th></th>
-              <th>OpenAI / Claude API</th>
-              <th>OpenRouter</th>
+              <th>OpenAI / Claude API keys</th>
+              <th>ChatGPT / Claude sign‑in<span class="fn">*</span></th>
+              <th>OpenRouter OAuth</th>
               <th>“Paste your key” apps</th>
               <th class="tpx-col">TPX</th>
             </tr>
@@ -182,33 +184,38 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
             <tr>
               <th>Who pays for inference</th>
               <td>The app developer</td>
-              <td>The app developer<span class="fn">*</span></td>
+              <td>The user’s subscription</td>
+              <td>The user’s credit balance</td>
               <td>The user</td>
-              <td class="tpx-col">The user</td>
+              <td class="tpx-col">The user’s provider balance</td>
             </tr>
             <tr>
               <th>What the app holds</th>
               <td>A raw vendor key</td>
-              <td>A raw aggregator key</td>
-              <td>The user’s raw key</td>
-              <td class="tpx-col">A scoped, budgeted grant</td>
+              <td>A vendor-issued token for your account</td>
+              <td>A key scoped to your account</td>
+              <td>Your raw key</td>
+              <td class="tpx-col">A budget-scoped grant</td>
             </tr>
             <tr>
               <th>Per-app spend cap</th>
               <td>No, the key spends freely</td>
-              <td>Per-key limits, set by the dev</td>
+              <td>Subscription rate limits, not a budget</td>
+              <td>Optional key limit, set after the fact</td>
               <td>No, the key spends freely</td>
-              <td class="tpx-col">Yes, a user-approved budget</td>
+              <td class="tpx-col">Yes, a budget you approve up front</td>
             </tr>
             <tr>
               <th>User revocation</th>
               <td>N/A, the user has nothing</td>
-              <td>N/A, the user has nothing</td>
+              <td>In vendor account settings</td>
+              <td>Revoke the key at OpenRouter</td>
               <td>Rotate the key everywhere</td>
               <td class="tpx-col">One click, one app</td>
             </tr>
             <tr>
               <th>Provider choice</th>
+              <td>That vendor</td>
               <td>That vendor</td>
               <td>One aggregator, many models</td>
               <td>Whatever the app hardcoded</td>
@@ -217,7 +224,8 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
             <tr>
               <th>What the app learns about you</th>
               <td>Whatever it collects</td>
-              <td>Whatever it collects</td>
+              <td>Your vendor account identity</td>
+              <td>A key tied to your account</td>
               <td>Your key = your account</td>
               <td class="tpx-col">Nothing; grants are pseudonymous</td>
             </tr>
@@ -225,26 +233,28 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
         </table>
       </div>
       <p class="muted fn-note">
-        * OpenRouter also sells credits to end users, but an app still integrates it with the
-        developer’s key; there’s no per-app consent, budget, or revocation flow.
+        * “Sign in with ChatGPT” and Claude’s app sign-in bill usage to your consumer
+        subscription, but only for vendor-approved apps, inside one vendor’s walls.
       </p>
       <div class="claims">
         <article>
           <h3>Genuinely new here</h3>
           <p>
-            The authorization flow itself: a user approves a <strong>metered token budget </strong>
-            for one app, the grant is a damage cap rather than a payment, and it’s revocable
-            without touching any other app. And the flow is <strong>provider-agnostic</strong>:
-            apps hardcode the protocol, not the vendor.
+            Not the connect-an-account gesture: OpenRouter’s OAuth flow and the vendor sign-in
+            programs got there first. What TPX adds is the shape of the grant and who can issue
+            it. The budget is approved <strong>up front on the consent screen</strong> as a hard
+            damage cap, the grant carries <strong>no identity</strong>, and the issuer is <strong>anyone with a discovery document</strong> rather than one company. Apps
+            hardcode the protocol, not the vendor.
           </p>
         </article>
         <article>
           <h3>Deliberately borrowed</h3>
           <p>
             The API surface is OpenAI’s, on purpose: your SDK already works. The consent
-            choreography is OAuth’s, on purpose: every developer already knows it. Vendor
-            programs like “Sign in with ChatGPT” bill an app’s usage to a user’s subscription,
-            but only inside one vendor’s walls; TPX is that idea with the walls removed.
+            choreography is OAuth’s, on purpose: every developer already knows it. And
+            user-funded apps are proven ground: OpenRouter charges connected apps to your credit
+            balance, and the vendor sign-ins charge approved apps to your subscription. TPX is
+            those ideas with the walls removed.
           </p>
         </article>
       </div>
@@ -542,7 +552,7 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
   .tariff {
     border-collapse: collapse;
     width: 100%;
-    min-width: 46rem;
+    min-width: 58rem;
     font-size: 0.9rem;
   }
 

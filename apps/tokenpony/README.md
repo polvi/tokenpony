@@ -55,6 +55,9 @@ per-model rates pulled live from the Workers AI catalog via `env.AI.models()` (c
 isolate, `src/pricing.ts`), with static fallbacks for models the catalog doesn't report.
 `usage.credits_charged` is returned on every completion and recorded in `usage_events`.
 
-`moonshotai/kimi-k3` ($3.00/M input, $0.30/M cached input, $15.00/M output) is a
-partner-catalog model billed through AI Gateway Unified Billing; it returns an upstream
-error until Unified Billing is enabled on the Cloudflare account in the dashboard.
+`moonshotai/kimi-k3` ($3.00/M input, $0.30/M cached input, $15.00/M output) is plumbed
+(partner models route through the AI Gateway named by the `AI_GATEWAY_ID` var, currently
+`tokenpony`) and statically priced, but is not in the served catalog: it bills through AI
+Gateway Unified Billing, which needs prepaid credits on the account. Re-add it to
+`src/models.ts` after purchasing credits. The Kimi lineup is currently served by
+`@cf/moonshotai/kimi-k2.7-code` under normal Workers AI billing.

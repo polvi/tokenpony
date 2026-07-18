@@ -10,12 +10,14 @@ export interface ModelEntry {
 }
 
 export const MODELS: ModelEntry[] = [
+  // kimi-k3 (moonshotai/kimi-k3, partner catalog) is plumbed and priced in
+  // pricing.ts; re-add here once Unified Billing credits are purchased.
   {
-    id: 'kimi-k3',
-    cf: 'moonshotai/kimi-k3',
+    id: 'kimi-k2.7-code',
+    cf: '@cf/moonshotai/kimi-k2.7-code',
     api: 'chat',
     owned_by: 'moonshotai',
-    description: 'Kimi K3, Moonshot flagship 2.8T, 1M context, partner-served',
+    description: 'Kimi K2.7 Code, 1T MoE, 262k context, tools + vision',
   },
   {
     id: 'llama-3.3-70b',
