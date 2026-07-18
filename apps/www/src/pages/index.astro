@@ -114,6 +114,57 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
       </div>
     </section>
 
+    <section id="eli5" class="campfire">
+      <div class="wrap">
+        <p class="eyebrow">Plain talk · no jargon, partner</p>
+        <h2>The campfire version.</h2>
+        <p class="section-lede">
+          Never touched a token in your life? Pull up a log. Here's the whole thing in
+          horse sense.
+        </p>
+        <div class="campfire-grid">
+          <article>
+            <h3>What in tarnation is a token?</h3>
+            <p>
+              Tokens are the hay that AI horses run on. Every word you send gets chopped into
+              bite-size pieces (those are tokens), the AI chews on them, and writes back more
+              tokens. Every bite costs a smidgen of real money, fractions of a penny.
+            </p>
+          </article>
+          <article>
+            <h3>So what's the trouble?</h3>
+            <p>
+              Today every app buys its own hay and sells it back to you inside yet another
+              monthly subscription. Ten apps, ten subscriptions, and you're paying for a lot
+              of hay you never feed to anybody. Enough to make you back out of the rodeo
+              entirely.
+            </p>
+          </article>
+          <article>
+            <h3>What does tokenpony do about it?</h3>
+            <p>
+              It's your own hay barn. Put a dollar or two in it once. When an app wants to
+              work for you, it moseys over and asks for a feed bag, say ten cents' worth.
+              You approve it with one tap, no password, no email. The app can never spend
+              more than what's in the bag, and when it's empty, it has to come ask again.
+            </p>
+          </article>
+          <article>
+            <h3>Why should I care?</h3>
+            <p>
+              One barn instead of ten subscriptions. No app can run off with your wallet;
+              a feed bag is the most it can ever spend, and you can yank it back any time.
+              And you're not hitched to anyone's wagon: any provider that speaks the same
+              protocol can hold your hay. Straight from the horse's mouth.
+            </p>
+          </article>
+        </div>
+        <p class="muted campfire-out">
+          That's the whole show. Technical folks can mosey on down for the wiring.
+        </p>
+      </div>
+    </section>
+
     <section id="how" class="wrap route">
       <p class="eyebrow">The route</p>
       <h2>OAuth taught apps to ask for identity.<br />TPX teaches them to ask for tokens.</h2>
@@ -424,6 +475,48 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     font-size: 0.98rem;
   }
 
+  /* Campfire ELI5 */
+  .campfire {
+    background: var(--panel);
+    padding-block: clamp(3rem, 7vw, 5rem);
+  }
+
+  .campfire h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .campfire-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin-top: 2rem;
+  }
+
+  .campfire-grid article {
+    background: var(--card);
+    border: 1.5px solid var(--ink);
+    border-radius: 6px;
+    padding: 1.4rem 1.5rem;
+    box-shadow: 3px 3px 0 var(--rule);
+  }
+
+  .campfire-grid h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--red);
+  }
+
+  .campfire-grid p {
+    color: var(--muted);
+    font-size: 0.97rem;
+  }
+
+  .campfire-out {
+    margin-top: 1.5rem;
+    font-style: italic;
+  }
+
   /* Waybill */
   .route {
     padding-block: clamp(3rem, 7vw, 5rem);
@@ -658,8 +751,9 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     }
 
     .why-grid,
-    .claims {
-      grid-template-columns: 1fr;
+    .claims,
+    .campfire-grid {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .waybill li {
