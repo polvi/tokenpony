@@ -1,0 +1,28 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "tokenpony-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tokenpony",
+      "database_id": "b5e41cbd-f1d3-4f32-b17f-7f982c5c2896"
+    }
+  ],
+  "vars": {
+    "ISSUER": "https://api.tokenpony.dev",
+    "AUTHGRAVITY_URL": "https://authgravity.tokenpony.dev",
+    "WWW_URL": "https://tokenpony.dev"
+  },
+  "routes": [
+    { "pattern": "api.tokenpony.dev", "custom_domain": true }
+  ]
+}
