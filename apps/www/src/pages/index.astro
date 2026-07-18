@@ -14,39 +14,39 @@ const steps = [
   {
     n: '01',
     name: 'Discover',
-    body: 'The app fetches /.well-known/tpx from whichever provider the user names. One JSON document lists the authorize, token, and API endpoints.',
+    body: 'The app fetches standard OAuth metadata (RFC 9728, then RFC 8414) from whichever provider the user names. A provider speaks TPX if it supports the llm-inference grant type.',
   },
   {
     n: '02',
     name: 'Authorize',
-    body: 'The app redirects to the provider. The user signs in with a passkey and approves the requested token budget on the consent page.',
+    body: 'The app pushes the request (PAR) with PKCE and a typed llm-inference budget, then redirects. The user signs in with a passkey and approves the budget on the consent page.',
   },
   {
     n: '03',
     name: 'Grant',
-    body: 'The app exchanges a one-time code for a tpx_ access token, scoped to that budget, tied to that app, revocable any time.',
+    body: 'The app exchanges the one-time code for a short-lived access token and a rotating refresh token, scoped to that budget, optionally DPoP-bound, revocable any time.',
   },
   {
     n: '04',
     name: 'Deliver',
-    body: 'The app calls the provider’s OpenAI-compatible API with the grant. The provider meters actual usage against the budget. When it’s spent, the app asks again.',
+    body: 'The app calls the provider’s OpenAI-compatible API. The provider meters actual usage in credits against the budget; usage.credits_charged reports every debit. When it’s spent, the app asks again.',
   },
 ];
 ---
 
 <Layout
   title="tokenpony: bring your own tokens to any LLM app"
-  description="tokenpony is the home of TPX, an OAuth-style protocol where apps ship without API keys and users bring their own token budget, and the reference provider that implements it end to end."
+  description="tokenpony is the home of TPX, an OAuth 2.0 profile for metered LLM inference grants where apps ship without API keys and users bring their own credit budget, and the reference provider that implements it."
 >
   <main>
     <section class="hero wrap">
       <div class="hero-copy">
-        <p class="eyebrow">TPX v0.1 · protocol + reference provider · proof of concept</p>
+        <p class="eyebrow">TPX v0.2 · an OAuth profile + reference provider · proof of concept</p>
         <h1>Bring your own tokens to any LLM&nbsp;app.</h1>
         <p class="lede">
-          tokenpony is two things: the home of <strong>TPX</strong>, an OAuth-style protocol
-          where apps ship without API keys and you pay a token provider you choose, and the
-          reference provider that implements it end to end. The app gets a metered budget. You
+          tokenpony is two things: the home of <strong>TPX</strong>, an OAuth 2.0 profile for
+          metered inference grants: apps ship without API keys and you pay a token provider
+          you choose. tokenpony is also the reference provider implementing it end to end. The app gets a metered budget. You
           keep the reins.
         </p>
         <div class="cta-row">
@@ -69,16 +69,19 @@ const steps = [
             <text x="60" y="69" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">2026</text>
           </svg>
         </div>
-        <pre><code><span class="c"># any TPX provider, one request</span>
-$ curl https://api.tokenpony.dev/.well-known/tpx
+        <pre><code><span class="c"># any TPX provider: plain OAuth discovery</span>
+$ curl https://api.tokenpony.dev\
+/.well-known/oauth-protected-resource
 
 &#123;
-  "tpx_version": "0.1",
-  "issuer": "https://api.tokenpony.dev",
-  "authorization_endpoint": "…/tpx/authorize",
-  "token_endpoint": "…/tpx/token",
-  "api_base": "…/v1"
-&#125;</code></pre>
+  "resource": "https://api.tokenpony.dev",
+  "authorization_servers": [
+    "https://api.tokenpony.dev"
+  ]
+&#125;
+<span class="c"># AS metadata advertises the TPX grant type:</span>
+<span class="c">#   authorization_details_types_supported:</span>
+<span class="c">#     ["llm-inference"]</span></code></pre>
       </figure>
     </section>
 
@@ -224,7 +227,7 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
               <td>That vendor</td>
               <td>One aggregator, many models</td>
               <td>Whatever the app hardcoded</td>
-              <td class="tpx-col">Any issuer of <code>/.well-known/tpx</code></td>
+              <td class="tpx-col">Any OAuth server supporting <code>llm-inference</code></td>
             </tr>
             <tr>
               <th>What the app learns about you</th>
@@ -255,8 +258,8 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
         <article>
           <h3>Deliberately borrowed</h3>
           <p>
-            The API surface is OpenAI’s, on purpose: your SDK already works. The consent
-            choreography is OAuth’s, on purpose: every developer already knows it. And
+            The API surface is OpenAI’s, on purpose: your SDK already works. The authorization layer IS OAuth, on purpose: v0.2 is a profile, so standard
+            client libraries work unmodified. And
             user-funded apps are proven ground: OpenRouter charges connected apps to your credit
             balance, and the vendor sign-ins charge approved apps to your subscription. TPX is
             those ideas with the walls removed.
@@ -272,16 +275,19 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
         The metered API is OpenAI-compatible. Register your app with one call, send users to
         authorize, and never touch an inference bill again.
       </p>
-      <pre class="quickstart"><code><span class="c"># register your app (open registration in the PoC)</span>
-$ curl -X POST https://api.tokenpony.dev/tpx/register \
-    -d '&#123;"name":"My App","redirect_uris":["https://myapp.example/callback"]&#125;'
+      <pre class="quickstart"><code><span class="c"># register your app (RFC 7591, open registration in the PoC)</span>
+$ curl -X POST https://api.tokenpony.dev/register \
+    -d '&#123;"client_name":"My App","redirect_uris":["https://myapp.example/callback"],
+         "token_endpoint_auth_method":"none"&#125;'
 
-<span class="c"># send the user to approve a budget</span>
-https://api.tokenpony.dev/tpx/authorize?client_id=…&redirect_uri=…&budget=100000&state=…
+<span class="c"># push the authorization request (PAR + PKCE + a typed budget), then redirect</span>
+$ curl -X POST https://api.tokenpony.dev/par \
+    -d 'response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256' \
+    -d 'authorization_details=[&#123;"type":"llm-inference","budget":100000&#125;]'
 
-<span class="c"># exchange the code, then chat on the user’s tokens</span>
+<span class="c"># exchange the code for tokens, then chat on the user’s credits</span>
 $ curl https://api.tokenpony.dev/v1/chat/completions \
-    -H "Authorization: Bearer tpx_…" \
+    -H "Authorization: Bearer tpx_at_…" \
     -d '&#123;"model":"llama-3.3-70b","messages":[&#123;"role":"user","content":"hi"&#125;]&#125;'</code></pre>
     </section>
   </main>

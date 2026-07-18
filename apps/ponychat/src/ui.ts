@@ -129,12 +129,12 @@ export function connectPage(defaultIssuer: string, error?: string): string {
   );
 }
 
-export function chatPage(issuer: string, budget: number): string {
+export function chatPage(issuer: string, budget: number, used = 0): string {
   return shell(
     'Pony Chat',
     `<header class="bar">
   <span class="wordmark">pony<b>chat</b><span class="tag">third-party demo</span></span>
-  <span class="meter">grant <b id="used">0</b> / ${budget.toLocaleString('en-US')} credits</span>
+  <span class="meter">grant <b id="used" data-init="${used}">${used.toLocaleString('en-US')}</b> / ${budget.toLocaleString('en-US')} credits</span>
   <span class="bar-right">
     <a class="provider-chip" href="${esc(issuer)}/dashboard" target="_blank" rel="noopener">tokens by ${esc(new URL(issuer).host)} · manage balance ↗</a>
     <select id="model" class="quiet"></select>
@@ -161,7 +161,7 @@ const promptEl = document.getElementById('prompt');
 const modelSel = document.getElementById('model');
 const usedEl = document.getElementById('used');
 const history = [];
-let used = 0;
+let used = Number(usedEl.dataset.init) || 0;
 
 fetch('/models').then(r => r.json()).then(body => {
   for (const m of body.data ?? []) {

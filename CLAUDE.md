@@ -32,7 +32,7 @@ repo layout. Commit and deploy freely once changes are verified.
 
 ## Verification habits
 
-- curl the live endpoints after deploying (`/.well-known/tpx`, `/v1/models`, a metered
+- curl the live endpoints after deploying (`/.well-known/oauth-protected-resource`, `/v1/models`, a metered
   completion with a seeded key when touching metering).
 - Visual checks: headless Chrome screenshots; for mobile widths use a 390px iframe
   harness (headless Chrome clamps its window to ~500px and crops).

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { api } from './api';
-import { tpx, discoveryDoc } from './tpx';
+import { oauth, authorizationServerMetadata, protectedResourceMetadata } from './oauth';
 import { dashboard } from './dashboard';
 import { billing } from './billing';
 import { jsonError } from './util';
@@ -13,28 +13,37 @@ app.onError((err, c) => {
   return jsonError(500, 'internal_error', 'Something went wrong');
 });
 
-// CORS for the API + TPX endpoints so browser apps can call them directly.
+// CORS for the API and OAuth endpoints so browser apps can call them directly.
+const CORS_PATHS = /^\/(v1|models|chat|token|par|register|introspect|revoke|\.well-known)(\/|$)/;
 app.use('*', async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     return c.body(null, 204, {
       'access-control-allow-origin': '*',
       'access-control-allow-methods': 'GET, POST, OPTIONS',
-      'access-control-allow-headers': 'authorization, content-type',
+      'access-control-allow-headers': 'authorization, content-type, dpop',
       'access-control-max-age': '86400',
     });
   }
   await next();
-  const path = new URL(c.req.url).pathname;
-  if (path.startsWith('/v1') || path.startsWith('/tpx/token') || path === '/.well-known/tpx') {
+  if (CORS_PATHS.test(new URL(c.req.url).pathname)) {
     c.res.headers.set('access-control-allow-origin', '*');
+    c.res.headers.set('access-control-expose-headers', 'www-authenticate, dpop-nonce');
   }
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));
 app.get('/llms.txt', (c) => c.redirect('https://tokenpony.dev/llms.txt', 302));
-app.get('/.well-known/tpx', (c) => c.json(discoveryDoc(c.env.ISSUER)));
+app.get('/.well-known/oauth-protected-resource', (c) =>
+  c.json(protectedResourceMetadata(c.env.ISSUER)),
+);
+app.get('/.well-known/oauth-authorization-server', (c) =>
+  c.json(authorizationServerMetadata(c.env.ISSUER)),
+);
+// Spec Section 8.2: API endpoints are relative to the resource identifier.
+// /v1 stays as the OpenAI-SDK-compatible alias.
 app.route('/v1', api);
-app.route('/tpx', tpx);
+app.route('/', api);
+app.route('/', oauth);
 app.route('/dashboard', dashboard);
 app.route('/billing', billing);
 

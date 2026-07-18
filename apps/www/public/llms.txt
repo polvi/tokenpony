@@ -1,131 +1,141 @@
-# tokenpony / Token Pony Express (TPX) v0.1
+# tokenpony / Token Pony Express (TPX) v0.2
 
-tokenpony is an LLM inference provider implementing TPX, an OAuth-style protocol where an
-application ships with NO LLM credentials of its own. The end user grants the app a metered
-credit budget from a provider the user chooses and pays. Grants are budget-capped,
-revocable, and pseudonymous (they carry no user identity).
+tokenpony is the home of TPX and its reference provider. TPX is an OAuth 2.0 profile
+(OAuth 2.1 baseline) for metered LLM inference grants: an application ships with NO LLM
+credentials of its own, and the user grants it a metered credit budget from a provider the
+user chooses and pays. Grants are budget-capped, revocable, and pseudonymous (they carry
+no user identity). A conforming OAuth client stack works without modification; everything
+TPX-specific is one authorization details type (llm-inference), one introspection member
+(budget_used), and one usage member (credits_charged).
 
-- Issuer (provider API): https://api.tokenpony.dev
-- Discovery: GET https://api.tokenpony.dev/.well-known/tpx
-- Human spec: https://tokenpony.dev/spec
+- Resource (inference API): https://api.tokenpony.dev
+- Discovery entry point: GET https://api.tokenpony.dev/.well-known/oauth-protected-resource
+- Full spec: https://tokenpony.dev/spec
 - User dashboard (passkey login): https://api.tokenpony.dev/dashboard
 - Demo TPX client app: https://ponychat.tokenpony.dev
 
 ## Units
 
-All balances and budgets are CREDITS: 1 credit = US$0.000001 (so "$X per M tokens" equals
-exactly X credits per token). Users buy credits at the dashboard via Stripe at face value
-($1 = 1,000,000 credits); checkout adds card fees at cost, and after a user's first top-off
-each purchase also adds postage: the price of one US Forever stamp (currently $0.82). There
-are no free credits. Per-model prices (USD per M input / cached input / output tokens) are
-published live on the models endpoint.
+All balances and budgets are CREDITS: 1 credit = US$0.000001, so "$X per M tokens" is
+exactly X credits per token. Users buy credits at the dashboard via Stripe at face value
+($1 = 1,000,000 credits); checkout adds card fees at cost, and after a user's first
+top-off each purchase also adds postage: the price of one US Forever stamp (currently
+$0.82). There are no free credits. Per-model rates in credits are on GET {resource}/models.
 
-## Integrating an app (the TPX flow)
+## Integrating an app (standard OAuth 2.1)
 
-Step 0. Discover. All shapes below generalize to any TPX issuer; hard-code the flow, not
-the vendor.
+Step 0. Discover (RFC 9728 then RFC 8414):
 
-    GET {issuer}/.well-known/tpx
-    -> {
-      "tpx_version": "0.1",
-      "issuer": "https://api.tokenpony.dev",
-      "authorization_endpoint": "https://api.tokenpony.dev/tpx/authorize",
-      "token_endpoint": "https://api.tokenpony.dev/tpx/token",
-      "registration_endpoint": "https://api.tokenpony.dev/tpx/register",
-      "api_base": "https://api.tokenpony.dev/v1",
-      "models_endpoint": "https://api.tokenpony.dev/v1/models",
-      "documentation": "https://tokenpony.dev/llms.txt"
-    }
+    GET {origin}/.well-known/oauth-protected-resource
+    -> { "resource": "https://api.tokenpony.dev",
+         "authorization_servers": ["https://api.tokenpony.dev"] }
 
-Step 1. Register your app once per issuer (open dynamic registration in v0.1). Store the
-secret; it is shown once and held hashed server-side.
+    GET {authorization_server}/.well-known/oauth-authorization-server
+    -> issuer, authorization_endpoint, token_endpoint,
+       pushed_authorization_request_endpoint, registration_endpoint,
+       introspection_endpoint, revocation_endpoint,
+       authorization_details_types_supported: ["llm-inference"], ...
+
+A provider speaks TPX iff authorization_details_types_supported includes "llm-inference".
+
+Step 1. Register once per provider (RFC 7591 dynamic registration):
 
     POST {registration_endpoint}
     Content-Type: application/json
-    { "name": "My App", "redirect_uris": ["https://myapp.example/callback"] }
-    -> { "client_id": "app_...", "client_secret": "cs_..." }
+    { "client_name": "My App",
+      "redirect_uris": ["https://myapp.example/callback"],
+      "token_endpoint_auth_method": "none" }        <- public client; PKCE, no secret
+    -> 201 { "client_id": "app_...", ... }
 
-    redirect_uris must be https (localhost allowed for development).
+Server-side (confidential) clients use "client_secret_basic" and receive a client_secret
+(shown once). redirect_uris are compared by exact string match; https required
+(localhost allowed for development).
 
-Step 2. Authorize. Send the user's browser to:
+Step 2. Authorize. PKCE S256 is REQUIRED. Push the request via PAR, then redirect:
 
-    {authorization_endpoint}?client_id=app_...
-      &redirect_uri=https://myapp.example/callback   (must exactly match a registered URI)
-      &state={opaque-csrf-value}                     (required; verify on return)
-      &budget={credits}                              (integer 1..10000000, i.e. up to $10)
+    POST {pushed_authorization_request_endpoint}     (form-encoded; Basic auth if confidential)
+    response_type=code&client_id=app_...
+    &redirect_uri=https://myapp.example/callback
+    &code_challenge={S256(verifier)}&code_challenge_method=S256
+    &resource=https://api.tokenpony.dev
+    &authorization_details=[{"type":"llm-inference","budget":100000}]
+    &state={optional}
+    -> 201 { "request_uri": "urn:ietf:params:oauth:request_uri:...", "expires_in": 90 }
 
-The provider authenticates the user (tokenpony uses passkeys via AuthGravity) and shows a
-consent page with your app name and the requested budget. On approval:
+    Redirect the user to: {authorization_endpoint}?client_id=app_...&request_uri=...
 
-    302 {redirect_uri}?code=tpxc_...&state={state}     (code is single-use, expires in 5 min)
+The budget is credits (100000 = $0.10 cap). Optional "models": ["kimi-k2.7-code", ...]
+restricts the grant to listed models. Unknown fields are rejected (fail closed).
 
-On denial: 302 {redirect_uri}?error=access_denied&state={state}
+The user authenticates with a passkey and approves. Callback:
 
-Step 3. Exchange the code (server-side).
+    302 {redirect_uri}?code=tpxc_...&state=...&iss=https://api.tokenpony.dev
+
+VALIDATE iss (RFC 9207) against the issuer the flow started with. Codes are single-use,
+5-minute expiry; replaying a used code revokes the grant it created.
+
+Step 3. Exchange the code (form-encoded, RFC 6749):
 
     POST {token_endpoint}
-    Content-Type: application/json
-    {
-      "grant_type": "authorization_code",
-      "code": "tpxc_...",
-      "client_id": "app_...",
-      "client_secret": "cs_...",
-      "redirect_uri": "https://myapp.example/callback"
-    }
-    -> {
-      "access_token": "tpx_...",
-      "token_type": "bearer",
-      "budget": 100000,
-      "budget_used": 0,
-      "api_base": "https://api.tokenpony.dev/v1"
-    }
+    grant_type=authorization_code&code=tpxc_...
+    &redirect_uri=https://myapp.example/callback
+    &client_id=app_...&code_verifier={verifier}
+    -> { "access_token": "tpx_at_...", "token_type": "Bearer", "expires_in": 3600,
+         "refresh_token": "tpx_rt_...",
+         "authorization_details": [{"type":"llm-inference","budget":100000}] }
 
-Step 4. Chat on the user's credits. api_base is OpenAI-compatible; any OpenAI SDK works by
-setting baseURL={api_base} and apiKey={access_token}.
+Read the granted budget from authorization_details (it may be lower than requested).
+Access tokens live 1 hour. Refresh with grant_type=refresh_token; refresh tokens ROTATE
+on every use, and reusing a rotated one revokes the grant. DPoP (ES256) is supported at
+/token and the API; send a DPoP proof to sender-constrain your tokens (recommended).
+OAuth endpoints return flat RFC 6749 errors: {"error": "...", "error_description": "..."}.
 
-    GET  {api_base}/models          (no auth required; includes live per-model pricing)
-    POST {api_base}/chat/completions
-    Authorization: Bearer tpx_...
+Step 4. Chat on the user's credits. The API is OpenAI-compatible, served both at
+{resource}/chat/completions and {resource}/v1/chat/completions (for OpenAI SDKs, set
+baseURL={resource}/v1 and apiKey={access_token}).
+
+    GET  {resource}/models          (no auth; includes credits_per_token rates)
+    POST {resource}/chat/completions
+    Authorization: Bearer tpx_at_...
     { "model": "llama-3.3-70b", "messages": [{"role":"user","content":"hi"}],
-      "stream": true|false, "max_tokens": 2048, "temperature": 0.7 }
+      "stream": true|false, "max_tokens": 2048 }
 
-Responses are standard OpenAI chat-completion shapes (SSE chunks when streaming). The
-usage block is extended with the exact charge:
+Every response carries the exact charge; streaming reports it in the final SSE chunk:
 
-    "usage": {
-      "prompt_tokens": 40, "completion_tokens": 3, "total_tokens": 43,
-      "prompt_tokens_details": { "cached_tokens": 0 },
-      "credits_charged": 19
-    }
+    "usage": { "prompt_tokens": 812, "cached_tokens": 256,
+               "completion_tokens": 214, "total_tokens": 1026,
+               "credits_charged": 1930 }
 
-In streaming responses, usage arrives in the final chunk before "data: [DONE]".
-max_tokens is automatically clamped to what the grant/balance can still afford.
+## Grant state
 
-## Errors
+    POST {introspection_endpoint}   token=tpx_at_...
+    -> { "active": true, "client_id": "app_...", "exp": ...,
+         "authorization_details": [{"type":"llm-inference","budget":100000}],
+         "budget_used": 41250 }
 
-All errors: HTTP status + body { "error": { "code": "...", "message": "..." } }
+Remaining budget = budget - budget_used. No identity claims are ever returned.
 
-    401 invalid_token       unknown/malformed/revoked-and-purged token
-    402 budget_exhausted    grant budget spent -> run the authorize flow again for a new grant
-    402 balance_exhausted   the user's provider balance is empty -> user must top off
-    403 grant_revoked       the user revoked this grant at the provider
-    400 invalid_grant       bad/expired/reused authorization code
-    404 model_not_found     unknown model id; list {models_endpoint}
-    502 upstream_error      inference backend failure
+    POST {revocation_endpoint}      token=tpx_rt_...
+    -> 200. Revokes the grant and all its tokens. Revoke grants you no longer need.
 
-When a grant runs dry, simply start a new authorization request; the user decides whether
-to top the app up. Never ask users for provider API keys; that is what grants replace.
+## Errors at the inference API
+
+    401 + WWW-Authenticate: Bearer error="invalid_token"
+        token expired/unknown/revoked -> refresh; if refresh says invalid_grant, re-authorize
+    402 {"error":{"code":"budget_exhausted"}}  grant budget spent -> new authorization request
+    402 {"error":{"code":"balance_exhausted"}} user's provider balance empty -> user tops off
+    403 {"error":{"code":"model_not_permitted"}} grant is model-restricted
+    404 {"error":{"code":"model_not_found"}}   list {resource}/models
+
+Never ask users for provider API keys; that is what grants replace.
 
 ## Personal API keys (non-TPX path)
 
 Users can mint personal keys (sk_...) in the dashboard and use them directly against
-{api_base} with any OpenAI SDK. Same metering, same error shapes.
+{resource}/v1 with any OpenAI SDK. Same metering, same error shapes.
 
-## Security notes
+## App conformance checklist (spec section 12)
 
-- Always send and verify the state parameter.
-- Authorization codes are single-use with a 5-minute TTL.
-- Tokens and client secrets are stored hashed by the provider.
-- A grant is a damage cap: a leaked tpx_ token can spend at most the remaining budget and
-  is revocable by the user at any time.
-- Grants carry no user identity: no email, no name, no provider account id.
+MUST: PKCE S256; validate iss; exact redirect_uris; request and read budgets via
+authorization_details; on 401 refresh, on invalid_grant re-authorize.
+SHOULD: use PAR and DPoP; introspect before large jobs; revoke unneeded grants.

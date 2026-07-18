@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { maybeAutoTopup } from './billing';
+import { verifyDpopProof } from './dpop';
 import { MODELS, resolveModel, type ModelEntry } from './models';
 import { creditsFor, getPrices, priceFor, type ModelPrice, type TokenCounts } from './pricing';
 import { estimateTokens, jsonError, sha256Hex } from './util';
@@ -24,13 +25,31 @@ interface Spender {
   userId: string;
   balance: number;
   apiKeyId?: string;
-  grant?: { id: string; remaining: number };
+  grant?: { id: string; remaining: number; models?: string[] | null };
+}
+
+/** RFC 6750/9728 challenge on 401s so clients can bootstrap discovery. */
+function unauthorized(c: Context<AppEnv>, message: string, invalidToken = true): Response {
+  const challenge = [
+    'Bearer',
+    ...(invalidToken ? ['error="invalid_token"'] : []),
+    `resource_metadata="${c.env.ISSUER}/.well-known/oauth-protected-resource"`,
+  ];
+  return Response.json(
+    { error: { code: 'invalid_token', message } },
+    {
+      status: 401,
+      headers: {
+        'www-authenticate': `${challenge[0]} ${challenge.slice(1).join(', ')}`,
+      },
+    },
+  );
 }
 
 async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
   const header = c.req.header('authorization') ?? '';
-  const token = header.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return jsonError(401, 'invalid_token', 'Missing Authorization: Bearer token');
+  const token = header.replace(/^(Bearer|DPoP)\s+/i, '').trim();
+  if (!token) return unauthorized(c, 'Missing access token', false);
   const hash = await sha256Hex(token);
 
   if (token.startsWith('sk_')) {
@@ -47,23 +66,45 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     return { userId: row.user_id, balance: row.balance_credits, apiKeyId: row.key_id };
   }
 
-  if (token.startsWith('tpx_')) {
+  if (token.startsWith('tpx_at_')) {
     const row = await c.env.DB.prepare(
-      `SELECT g.id AS grant_id, g.status, g.budget_total, g.budget_used, u.id AS user_id, u.balance_credits
-       FROM grants g JOIN users u ON u.id = g.user_id WHERE g.token_hash = ?`,
+      `SELECT a.expires_at, a.dpop_jkt, g.id AS grant_id, g.status, g.budget_total, g.budget_used, g.models,
+              u.id AS user_id, u.balance_credits
+       FROM access_tokens a
+       JOIN grants g ON g.id = a.grant_id
+       JOIN users u ON u.id = g.user_id
+       WHERE a.token_hash = ?`,
     )
       .bind(hash)
       .first<{
+        expires_at: string;
+        dpop_jkt: string | null;
         grant_id: string;
         status: string;
         budget_total: number;
         budget_used: number;
+        models: string | null;
         user_id: string;
         balance_credits: number;
       }>();
-    if (!row) return jsonError(401, 'invalid_token', 'Unknown grant token');
-    if (row.status !== 'active')
-      return jsonError(403, 'grant_revoked', 'The user revoked this grant');
+    if (!row) return unauthorized(c, 'Unknown access token');
+    if (Date.parse(`${row.expires_at}Z`) < Date.now())
+      return unauthorized(c, 'Access token expired');
+    // A revoked grant is an invalid token (v0.2 collapses 403 grant_revoked).
+    if (row.status !== 'active') return unauthorized(c, 'Grant revoked');
+    if (row.dpop_jkt) {
+      const proof = c.req.header('dpop');
+      const jkt = proof
+        ? await verifyDpopProof({
+            proof,
+            htm: c.req.method,
+            htu: c.req.url,
+            accessToken: token,
+          })
+        : null;
+      if (!jkt || jkt !== row.dpop_jkt)
+        return unauthorized(c, 'DPoP proof missing or bound to a different key');
+    }
     const remaining = row.budget_total - row.budget_used;
     if (remaining <= 0)
       return jsonError(402, 'budget_exhausted', 'Grant budget spent; request a new authorization');
@@ -72,11 +113,15 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     return {
       userId: row.user_id,
       balance: row.balance_credits,
-      grant: { id: row.grant_id, remaining },
+      grant: {
+        id: row.grant_id,
+        remaining,
+        models: row.models ? (JSON.parse(row.models) as string[]) : null,
+      },
     };
   }
 
-  return jsonError(401, 'invalid_token', 'Unrecognized token format');
+  return unauthorized(c, 'Unrecognized token format');
 }
 
 async function debit(
@@ -134,10 +179,11 @@ function normalizeCounts(raw: unknown, prompt: string, completion: string): Toke
   return { prompt_tokens, cached_tokens, completion_tokens };
 }
 
-/** OpenAI-compatible usage block, extended with tokenpony's credit charge. */
+/** OpenAI-compatible usage block, extended per TPX v0.2 (Section 8.3). */
 function usageBlock(counts: TokenCounts, credits: number) {
   return {
     prompt_tokens: counts.prompt_tokens,
+    cached_tokens: counts.cached_tokens,
     completion_tokens: counts.completion_tokens,
     total_tokens: counts.prompt_tokens + counts.completion_tokens,
     prompt_tokens_details: { cached_tokens: counts.cached_tokens },
@@ -214,6 +260,12 @@ api.get('/models', async (c) => {
           usd_per_m_input_tokens: p.inputPerM,
           usd_per_m_cached_input_tokens: p.cachedInputPerM,
           usd_per_m_output_tokens: p.outputPerM,
+          // TPX v0.2 Section 4.3: per-token rates in credits.
+          credits_per_token: {
+            input: p.inputPerM,
+            cached_input: p.cachedInputPerM,
+            output: p.outputPerM,
+          },
           source: prices[m.cf] ? 'cloudflare_catalog' : 'static',
         })),
       })),
@@ -237,6 +289,8 @@ api.post('/chat/completions', async (c) => {
   const model = resolveModel(body.model);
   if (!model)
     return jsonError(404, 'model_not_found', `Unknown model '${body.model}'; see /v1/models`);
+  if (spender.grant?.models && !spender.grant.models.includes(model.id))
+    return jsonError(403, 'model_not_permitted', `This grant is limited to: ${spender.grant.models.join(', ')}`);
 
   const price = await priceFor(c.env, model.cf);
 

@@ -13,16 +13,16 @@ actual usage against that grant. Grants are budget-capped, revocable, and pseudo
 | Host | What |
 | --- | --- |
 | [tokenpony.dev](https://tokenpony.dev) | Marketing site, [spec](https://tokenpony.dev/spec), [ELI5](https://tokenpony.dev/eli5), [llms.txt](https://tokenpony.dev/llms.txt) |
-| [api.tokenpony.dev](https://api.tokenpony.dev/.well-known/tpx) | TPX issuer + OpenAI-compatible metered API + user dashboard |
+| [api.tokenpony.dev](https://api.tokenpony.dev/.well-known/oauth-protected-resource) | TPX issuer + OpenAI-compatible metered API + user dashboard |
 | [ponychat.tokenpony.dev](https://ponychat.tokenpony.dev) | Demo third-party app with zero LLM credentials |
 | authgravity.tokenpony.dev | Passkey accounts + relationship authz (external service) |
 
-Agents integrate from `GET /.well-known/tpx` → its `documentation` field → `llms.txt`.
+Agents integrate from `GET /.well-known/oauth-protected-resource` → its `documentation` field → `llms.txt`.
 
 ## Repo layout
 
 ```
-SPEC.md            TPX v0.1 protocol spec (source of truth; mirrored at /spec)
+SPEC.md            TPX v0.2 protocol spec (source of truth; mirrored at /spec)
 packages/tpx/      @tokenpony/tpx client SDK (types, discover, authorize, exchange, chat)
 apps/www/          Astro marketing site -> tokenpony.dev
 apps/tokenpony/    provider Worker (Hono + D1 + Workers AI) -> api.tokenpony.dev

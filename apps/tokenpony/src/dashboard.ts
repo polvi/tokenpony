@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { esc, page } from './html';
 import { randomToken, sha256Hex } from './util';
 import { applicationTuples, checkPermission, writeTuples } from './authz';
+import { revokeGrant } from './oauth';
 import { requireSession } from './auth';
 import { PACKS, checkoutAmountCents, hasPaidBefore, postageCents } from './billing';
 import { usd } from './pricing';
@@ -156,7 +157,7 @@ ${
   <input type="url" name="redirect_uri" placeholder="https://yourapp.example/callback" required>
   <button type="submit">Register app</button>
 </form>
-<p class="muted">Registration is also open via <code>POST /tpx/register</code>; see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
+<p class="muted">Registration is also open via <code>POST /register</code> (RFC 7591); see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
 
 <h2>Session</h2>
 <form method="post" action="${esc(c.env.AUTHGRAVITY_URL)}/v1/logout"><button class="quiet">Log out</button></form>`,
@@ -228,9 +229,10 @@ dashboard.post('/grants/:id/revoke', async (c) => {
   if (allowed === false) {
     return c.html(page('Not allowed · tokenpony', '<h1>You cannot revoke this grant.</h1><p><a href="/dashboard">Back</a></p>'), 403);
   }
-  await c.env.DB.prepare("UPDATE grants SET status = 'revoked' WHERE id = ? AND user_id = ?")
+  const owned = await c.env.DB.prepare('SELECT id FROM grants WHERE id = ? AND user_id = ?')
     .bind(grantId, c.get('user').id)
-    .run();
+    .first();
+  if (owned) await revokeGrant(c.env.DB, grantId);
   return c.redirect('/dashboard');
 });
 
@@ -250,7 +252,7 @@ dashboard.post('/apps', async (c) => {
   const clientId = randomToken('app_');
   const clientSecret = randomToken('cs_');
   await c.env.DB.prepare(
-    'INSERT INTO apps (client_id, client_secret_hash, name, redirect_uris, owner_user_id) VALUES (?, ?, ?, ?, ?)',
+    "INSERT INTO apps (client_id, client_secret_hash, name, redirect_uris, owner_user_id, token_endpoint_auth_method) VALUES (?, ?, ?, ?, ?, 'client_secret_basic')",
   )
     .bind(clientId, await sha256Hex(clientSecret), name, JSON.stringify([redirectUri]), user.id)
     .run();

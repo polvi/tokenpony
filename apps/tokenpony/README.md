@@ -1,6 +1,6 @@
 # tokenpony-api
 
-The tokenpony provider Worker at **api.tokenpony.dev**: TPX v0.1 issuer (discovery, client
+The tokenpony provider Worker at **api.tokenpony.dev**: TPX v0.2 issuer (discovery, client
 registration, consent, token exchange), OpenAI-compatible metered inference over Workers AI,
 user dashboard, and Stripe billing. See the repo root `SPEC.md` for the protocol.
 
