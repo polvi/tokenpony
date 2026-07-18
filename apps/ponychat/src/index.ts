@@ -110,9 +110,9 @@ app.get('/callback', async (c) => {
   const { code, state, error } = c.req.query();
 
   if (error === 'access_denied')
-    return c.html(connectPage(c.env.DEFAULT_ISSUER, 'You denied the request — no grant issued.'));
+    return c.html(connectPage(c.env.DEFAULT_ISSUER, 'You denied the request, so no grant was issued.'));
   if (!saved || !code || state !== saved.state)
-    return c.html(connectPage(c.env.DEFAULT_ISSUER, 'State mismatch — try connecting again.'), 400);
+    return c.html(connectPage(c.env.DEFAULT_ISSUER, 'State mismatch. Try connecting again.'), 400);
 
   try {
     const discovery = await discover(saved.issuer);

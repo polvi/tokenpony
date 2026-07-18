@@ -1,5 +1,5 @@
 /**
- * @tokenpony/tpx — client SDK for the Token Pony Express (TPX) v0.1.
+ * @tokenpony/tpx: client SDK for the Token Pony Express (TPX) v0.1.
  *
  * TPX lets an app request a metered LLM token budget from a provider the
  * user chooses and pays. See https://tokenpony.dev/spec.

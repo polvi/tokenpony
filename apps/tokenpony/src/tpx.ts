@@ -99,14 +99,14 @@ tpx.get('/authorize', async (c) => {
 
   return c.html(
     page(
-      'Authorize — tokenpony',
+      'Authorize · tokenpony',
       `<p class="eyebrow">Authorization request</p>
 <h1>${esc(app.name)} is asking for a token budget.</h1>
 <div class="card">
   <p><strong>${esc(app.name)}</strong> wants to spend up to
      <strong>${budget.toLocaleString('en-US')} tokens</strong> from your tokenpony balance.</p>
   <p class="muted">Your balance: ${user.balance_tokens.toLocaleString('en-US')} tokens.
-     The app never sees your keys or your identity — only this metered budget.
+     The app never sees your keys or your identity, only this metered budget.
      You can revoke it any time from your dashboard.</p>
   <div class="row" style="margin-top:1rem">
     <form method="post" action="/tpx/decision">${hidden}

@@ -28,7 +28,7 @@ Both Stripe secrets were set on 2026-07-17 (test mode).
 with inline `price_data` (packs defined in `src/billing.ts`) and inserts a pending row in
 `payments`. Stripe redirects back to `/dashboard?paid=1`. The webhook verifies the
 `stripe-signature` HMAC (5-minute replay window, constant-time compare) and, on
-`checkout.session.completed`, marks the payment paid and credits `users.balance_tokens` —
+`checkout.session.completed`, marks the payment paid and credits `users.balance_tokens`,
 idempotent per session id.
 
 ## Database
