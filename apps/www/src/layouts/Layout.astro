@@ -1,0 +1,122 @@
+---
+import '@fontsource/zilla-slab/600.css';
+import '@fontsource/zilla-slab/700.css';
+import '@fontsource-variable/public-sans';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div class="hatch" aria-hidden="true"></div>
+    <header class="site-header wrap">
+      <a class="wordmark" href="/">tokenpony</a>
+      <nav aria-label="Site">
+        <a href="/#how">How it works</a>
+        <a href="/#models">Models</a>
+        <a href="/#developers">Developers</a>
+        <a href="/spec">Spec</a>
+        <a class="nav-cta" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
+      </nav>
+    </header>
+    <slot />
+    <footer>
+      <div class="hatch" aria-hidden="true"></div>
+      <div class="wrap footer-inner">
+        <p class="footer-note">
+          tokenpony is a proof of concept of the Token Pony Protocol. Inference runs on
+          Cloudflare Workers AI open-weight models. Accounts by
+          <a href="https://authgravity.tokenpony.dev">AuthGravity</a> — passkeys, no emails.
+        </p>
+        <nav aria-label="Footer">
+          <a href="https://ponychat.tokenpony.dev">Pony Chat</a>
+          <a href="https://api.tokenpony.dev/dashboard">Dashboard</a>
+          <a href="/spec">TPP v0.1 spec</a>
+          <a href="https://api.tokenpony.dev/.well-known/tpp">Discovery document</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-block: 1.25rem;
+  }
+
+  .wordmark {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  nav {
+    display: flex;
+    gap: 1.4rem;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+  }
+
+  nav a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  nav a:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--red);
+    text-decoration-thickness: 2px;
+  }
+
+  .nav-cta {
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  footer {
+    margin-top: clamp(3rem, 8vw, 6rem);
+  }
+
+  .footer-inner {
+    padding-block: 2rem 3rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-note {
+    max-width: 44ch;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  footer nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+</style>

@@ -1,0 +1,99 @@
+:root {
+  --paper: #fbf8f0;
+  --panel: #f3eee1;
+  --card: #ffffff;
+  --ink: #1d2233;
+  --muted: #5c6072;
+  --blue: #26409a;
+  --blue-deep: #1b2f73;
+  --red: #ce3b2c;
+  --rule: #dad3c2;
+
+  --font-display: 'Zilla Slab', 'Iowan Old Style', serif;
+  --font-body: 'Public Sans Variable', 'Helvetica Neue', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --measure: 68ch;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--blue);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* Airmail envelope hatching — the signature device */
+.hatch {
+  height: 10px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--red) 0 14px,
+    var(--paper) 14px 26px,
+    var(--blue) 26px 40px,
+    var(--paper) 40px 52px
+  );
+}
+
+.wrap {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

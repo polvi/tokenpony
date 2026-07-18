@@ -1,0 +1,478 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const models = [
+  { id: 'llama-3.3-70b', maker: 'Meta', denom: '70B', note: 'fast fp8 serving' },
+  { id: 'gpt-oss-120b', maker: 'OpenAI', denom: '120B', note: 'open-weight reasoning' },
+  { id: 'qwen2.5-coder-32b', maker: 'Alibaba', denom: '32B', note: 'tuned for code' },
+  { id: 'mistral-small-24b', maker: 'Mistral', denom: '24B', note: 'vision + text' },
+  { id: 'llama-3.1-8b', maker: 'Meta', denom: '8B', note: 'quick and cheap' },
+];
+
+const steps = [
+  {
+    n: '01',
+    name: 'Discover',
+    body: 'The app fetches /.well-known/tpp from whichever provider the user names. One JSON document lists the authorize, token, and API endpoints.',
+  },
+  {
+    n: '02',
+    name: 'Authorize',
+    body: 'The app redirects to the provider. The user signs in with a passkey and approves the requested token budget on the consent page.',
+  },
+  {
+    n: '03',
+    name: 'Grant',
+    body: 'The app exchanges a one-time code for a tpp_ access token — scoped to that budget, tied to that app, revocable any time.',
+  },
+  {
+    n: '04',
+    name: 'Deliver',
+    body: 'The app calls the provider’s OpenAI-compatible API with the grant. The provider meters actual usage against the budget. When it’s spent, the app asks again.',
+  },
+];
+---
+
+<Layout
+  title="tokenpony — bring your own tokens to any LLM app"
+  description="tokenpony is an LLM proxy for Cloudflare's open-source models and the first provider to speak TPP, an OAuth-style protocol where apps ship without API keys and users bring their own token budget."
+>
+  <main>
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Token Pony Protocol · TPP v0.1 · proof of concept</p>
+        <h1>Bring your own tokens to any LLM&nbsp;app.</h1>
+        <p class="lede">
+          tokenpony is an LLM proxy for Cloudflare’s open-source models — and the first provider
+          to speak <strong>TPP</strong>, an OAuth-style protocol where apps ship without API keys
+          and you pay a token provider you choose. The app gets a metered budget. You keep the
+          reins.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
+          <a class="btn btn-ghost" href="/spec">Read the spec</a>
+        </div>
+      </div>
+      <figure class="envelope" aria-label="TPP discovery request, styled as an airmail envelope">
+        <div class="postmark" aria-hidden="true">
+          <svg viewBox="0 0 120 120" width="110" height="110">
+            <defs>
+              <path id="ring" d="M 60,60 m -44,0 a 44,44 0 1,1 88,0 a 44,44 0 1,1 -88,0" />
+            </defs>
+            <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="2" />
+            <circle cx="60" cy="60" r="32" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <text font-size="10.5" letter-spacing="2.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+              <textPath href="#ring">TOKENPONY · TPP/0.1 · USER-PAID ·</textPath>
+            </text>
+            <text x="60" y="57" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">EST.</text>
+            <text x="60" y="69" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">2026</text>
+          </svg>
+        </div>
+        <pre><code><span class="c"># any TPP provider, one request</span>
+$ curl https://api.tokenpony.dev/.well-known/tpp
+
+&#123;
+  "tpp_version": "0.1",
+  "issuer": "https://api.tokenpony.dev",
+  "authorization_endpoint": "…/tpp/authorize",
+  "token_endpoint": "…/tpp/token",
+  "api_base": "…/v1"
+&#125;</code></pre>
+      </figure>
+    </section>
+
+    <section class="why">
+      <div class="wrap">
+        <h2>Apps shouldn’t have to sell you tokens.</h2>
+        <div class="why-grid">
+          <article>
+            <h3>Today, every app buys tokens</h3>
+            <p>
+              Every LLM app fronts its own inference bill — so every app fights abuse, throttles
+              free tiers, and gates features behind yet another subscription. A thousand apps, a
+              thousand billing relationships.
+            </p>
+          </article>
+          <article>
+            <h3>With TPP, you bring a budget</h3>
+            <p>
+              You hold one balance with a provider you trust. An app asks for a scoped grant —
+              say, 100k tokens — and you approve it with a passkey. The app never sees your keys
+              or your card.
+            </p>
+          </article>
+          <article>
+            <h3>The result is an open ecosystem</h3>
+            <p>
+              Developers ship LLM apps the way they ship static sites: no inference bill, no
+              abuse surface, no billing ops. Providers compete on price and models, the way hosts
+              compete on email or DNS.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="wrap route">
+      <p class="eyebrow">The route</p>
+      <h2>OAuth taught apps to ask for identity.<br />TPP teaches them to ask for tokens.</h2>
+      <ol class="waybill">
+        {
+          steps.map((s) => (
+            <li>
+              <span class="step-n" aria-hidden="true">{s.n}</span>
+              <div>
+                <h3>{s.name}</h3>
+                <p>{s.body}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section id="models" class="stable">
+      <div class="wrap">
+        <p class="eyebrow">The stable</p>
+        <h2>Open-weight models only.</h2>
+        <p class="section-lede">
+          Served from Cloudflare Workers AI. Every model here has published weights — any
+          provider can run them, so no app built on TPP is locked to us.
+        </p>
+        <ul class="stamp-sheet">
+          {
+            models.map((m) => (
+              <li class="stamp">
+                <div class="stamp-body">
+                  <span class="denom">{m.denom}</span>
+                  <span class="stamp-id">{m.id}</span>
+                  <span class="stamp-meta">{m.maker} · {m.note}</span>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <section id="developers" class="wrap devs">
+      <p class="eyebrow">For developers</p>
+      <h2>Point your existing SDK at the pony.</h2>
+      <p class="section-lede">
+        The metered API is OpenAI-compatible. Register your app with one call, send users to
+        authorize, and never touch an inference bill again.
+      </p>
+      <pre class="quickstart"><code><span class="c"># register your app (open registration in the PoC)</span>
+$ curl -X POST https://api.tokenpony.dev/tpp/register \
+    -d '&#123;"name":"My App","redirect_uris":["https://myapp.example/callback"]&#125;'
+
+<span class="c"># send the user to approve a budget</span>
+https://api.tokenpony.dev/tpp/authorize?client_id=…&redirect_uri=…&budget=100000&state=…
+
+<span class="c"># exchange the code, then chat on the user’s tokens</span>
+$ curl https://api.tokenpony.dev/v1/chat/completions \
+    -H "Authorization: Bearer tpp_…" \
+    -d '&#123;"model":"llama-3.3-70b","messages":[&#123;"role":"user","content":"hi"&#125;]&#125;'</code></pre>
+    </section>
+  </main>
+</Layout>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: center;
+    padding-block: clamp(3rem, 8vw, 6rem);
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 5.5vw, 4rem);
+    margin-block: 0.75rem 1.25rem;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    max-width: 52ch;
+    color: var(--muted);
+  }
+
+  .lede strong {
+    color: var(--ink);
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: var(--font-body);
+    font-weight: 600;
+    text-decoration: none;
+    padding: 0.75rem 1.4rem;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+
+  .btn-primary {
+    background: var(--blue);
+    color: var(--paper);
+    border: 2px solid var(--blue-deep);
+    box-shadow: 3px 3px 0 var(--blue-deep);
+  }
+
+  .btn-primary:hover {
+    translate: 1px 1px;
+    box-shadow: 2px 2px 0 var(--blue-deep);
+  }
+
+  .btn-ghost {
+    color: var(--ink);
+    border: 2px solid var(--ink);
+  }
+
+  .btn-ghost:hover {
+    background: var(--panel);
+  }
+
+  /* The envelope */
+  .envelope {
+    position: relative;
+    background: var(--card);
+    border: 10px solid transparent;
+    border-image: repeating-linear-gradient(
+        -45deg,
+        var(--red) 0 12px,
+        var(--card) 12px 20px,
+        var(--blue) 20px 32px,
+        var(--card) 32px 40px
+      )
+      10;
+    box-shadow: 0 12px 30px rgb(29 34 51 / 0.12);
+    padding: 1.5rem 1.25rem 1.25rem;
+    rotate: 1.2deg;
+    margin: 0;
+  }
+
+  .envelope pre {
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    padding-top: 0.5rem;
+  }
+
+  .postmark {
+    position: absolute;
+    top: -3.4rem;
+    right: -2rem;
+    color: var(--red);
+    opacity: 0.85;
+    rotate: -12deg;
+    animation: stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) 0.3s backwards;
+  }
+
+  @keyframes stamp-in {
+    from {
+      scale: 1.8;
+      opacity: 0;
+    }
+    to {
+      scale: 1;
+      opacity: 0.85;
+    }
+  }
+
+  .c {
+    color: var(--muted);
+  }
+
+  /* Why */
+  .why {
+    background: var(--ink);
+    color: var(--paper);
+    padding-block: clamp(3rem, 7vw, 5rem);
+  }
+
+  .why h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    max-width: 24ch;
+  }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: 2.5rem;
+  }
+
+  .why-grid h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.6rem;
+    color: #f0c9c2;
+  }
+
+  .why-grid p {
+    color: #c3c7d4;
+    font-size: 0.98rem;
+  }
+
+  /* Waybill */
+  .route {
+    padding-block: clamp(3rem, 7vw, 5rem);
+  }
+
+  .route h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .waybill {
+    list-style: none;
+    padding: 0;
+    margin-top: 2.5rem;
+    border-top: 2px solid var(--ink);
+  }
+
+  .waybill li {
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr);
+    gap: 1.5rem;
+    padding-block: 1.75rem;
+    border-bottom: 1px dashed var(--rule);
+  }
+
+  .step-n {
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    color: var(--red);
+  }
+
+  .waybill h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .waybill p {
+    max-width: var(--measure);
+    color: var(--muted);
+  }
+
+  /* Stamp sheet */
+  .stable {
+    background: var(--panel);
+    padding-block: clamp(3rem, 7vw, 5rem);
+  }
+
+  .stable h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .section-lede {
+    max-width: 60ch;
+    color: var(--muted);
+    margin-top: 0.75rem;
+  }
+
+  .stamp-sheet {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+  }
+
+  .stamp {
+    background-color: var(--card);
+    background-image: radial-gradient(var(--panel) 5px, transparent 5.5px);
+    background-size: 16px 16px;
+    background-position: -8px -8px;
+    padding: 9px;
+  }
+
+  .stamp-body {
+    position: relative;
+    background: var(--card);
+    border: 1.5px solid var(--blue);
+    outline: 1px solid var(--blue);
+    outline-offset: -5px;
+    padding: 1rem 0.9rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 8.5rem;
+  }
+
+  .denom {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.9rem;
+    color: var(--blue);
+    line-height: 1;
+  }
+
+  .stamp-id {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    margin-top: auto;
+  }
+
+  .stamp-meta {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  /* Developers */
+  .devs {
+    padding-block: clamp(3rem, 7vw, 5rem) 0;
+  }
+
+  .devs h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .quickstart {
+    margin-top: 2rem;
+    background: var(--ink);
+    color: #e8e5da;
+    padding: 1.5rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+
+  .quickstart .c {
+    color: #8a90a6;
+  }
+
+  @media (max-width: 56rem) {
+    .hero {
+      grid-template-columns: 1fr;
+    }
+
+    .envelope {
+      rotate: 0deg;
+      margin-top: 1rem;
+    }
+
+    .postmark {
+      top: -1.8rem;
+      right: 0.2rem;
+    }
+
+    .why-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .waybill li {
+      grid-template-columns: 3rem minmax(0, 1fr);
+      gap: 1rem;
+    }
+  }
+</style>

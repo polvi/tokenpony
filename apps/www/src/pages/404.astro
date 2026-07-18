@@ -1,0 +1,22 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Not found — tokenpony" description="This page doesn't exist.">
+  <main class="wrap nf">
+    <p class="eyebrow">Return to sender</p>
+    <h1>No such address.</h1>
+    <p>The page you asked for isn't on this route. <a href="/">Back to tokenpony.dev</a>.</p>
+  </main>
+</Layout>
+
+<style>
+  .nf {
+    padding-block: clamp(4rem, 12vw, 8rem);
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    margin-block: 0.75rem 1rem;
+  }
+</style>

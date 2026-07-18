@@ -1,0 +1,88 @@
+---
+import Layout from './Layout.astro';
+
+interface Props {
+  frontmatter: { title: string; description: string };
+}
+
+const { frontmatter } = Astro.props;
+---
+
+<Layout title={frontmatter.title} description={frontmatter.description}>
+  <article class="prose wrap">
+    <slot />
+  </article>
+</Layout>
+
+<style is:global>
+  .prose {
+    max-width: 46rem;
+    padding-block: clamp(2rem, 6vw, 4rem);
+  }
+
+  .prose h1 {
+    font-size: clamp(2rem, 4.5vw, 3rem);
+    margin-bottom: 1.5rem;
+  }
+
+  .prose h2 {
+    font-size: 1.6rem;
+    margin-block: 2.5rem 0.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px dashed var(--rule);
+  }
+
+  .prose h3 {
+    font-size: 1.15rem;
+    margin-block: 1.75rem 0.5rem;
+  }
+
+  .prose p,
+  .prose ul,
+  .prose ol {
+    margin-block: 0.9rem;
+  }
+
+  .prose li {
+    margin-block: 0.35rem;
+  }
+
+  .prose pre {
+    background: var(--ink);
+    color: #e8e5da;
+    padding: 1.1rem 1.3rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-block: 1.1rem;
+  }
+
+  .prose :not(pre) > code {
+    background: var(--panel);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.88em;
+  }
+
+  .prose table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.95rem;
+    margin-block: 1.1rem;
+  }
+
+  .prose th,
+  .prose td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .prose th {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+</style>
