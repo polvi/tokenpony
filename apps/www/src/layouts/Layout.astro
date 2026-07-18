@@ -35,7 +35,17 @@ const ctaLink = { href: 'https://ponychat.tokenpony.dev', label: 'Try Pony Chat'
   <body>
     <div class="hatch" aria-hidden="true"></div>
     <header class="site-header wrap">
-      <a class="wordmark" href="/">tokenpony</a>
+      <a class="wordmark" href="/">
+        <svg class="logo" viewBox="0 0 64 64" width="36" height="36" aria-hidden="true">
+          <rect x="6" y="6" width="52" height="52" fill="#ffffff" stroke="#26409a" stroke-width="3"></rect>
+          <rect x="11" y="11" width="42" height="42" fill="none" stroke="#26409a" stroke-width="1.5"></rect>
+          <path d="M21 49 C21 41 23 35 27 31 C23 30 19 27 16 23 C14 20 15 18 18 18 L24 19 L27 13 L30 17 L34 12 L36 18 C43 21 47 28 47 36 L47 49 Z" fill="#1d2233"></path>
+          <path d="M36 18 C43 21 47 28 47 36 L47 49 L43 49 C43 36 41 27 34 22 Z" fill="#ce3b2c"></path>
+          <circle cx="26" cy="24" r="1.7" fill="#fbf8f0"></circle>
+          <circle cx="18.5" cy="20.5" r="1" fill="#fbf8f0"></circle>
+        </svg>
+        <span>tokenpony</span>
+      </a>
       <nav class="nav-desktop" aria-label="Site">
         {navLinks.map((l) => <a href={l.href}>{l.label}</a>)}
         <a class="nav-cta" href={ctaLink.href}>{ctaLink.label}</a>
@@ -90,6 +100,23 @@ const ctaLink = { href: 'https://ponychat.tokenpony.dev', label: 'Try Pony Chat'
     font-size: 1.5rem;
     color: var(--ink);
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .logo {
+    flex: none;
+  }
+
+  .wordmark:hover .logo {
+    rotate: -4deg;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .logo {
+      transition: rotate 0.15s ease;
+    }
   }
 
   nav a {
