@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ponychat",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PONYCHAT_KV",
+      "id": "4ab2757c2ac94a669fac30a1a6af361b"
+    }
+  ],
+  "vars": {
+    "APP_URL": "https://ponychat.tokenpony.dev",
+    "DEFAULT_ISSUER": "https://api.tokenpony.dev"
+  },
+  "routes": [
+    { "pattern": "ponychat.tokenpony.dev", "custom_domain": true }
+  ]
+}
