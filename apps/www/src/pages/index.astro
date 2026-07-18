@@ -155,6 +155,99 @@ $ curl https://api.tokenpony.dev/.well-known/tpx
       </div>
     </section>
 
+    <section id="compare" class="wrap compare">
+      <p class="eyebrow">The field</p>
+      <h2>Where TPX is new — and where it honestly isn’t.</h2>
+      <p class="section-lede">
+        Every piece of this exists somewhere. The OpenAI and Anthropic APIs settled what an
+        inference API looks like. OpenRouter proved one API can front many models. “Bring your
+        own key” apps proved users will pay for their own inference. And OAuth is fifteen years
+        old. TPX’s only claim is the combination: OAuth’s <em>consent-and-scope</em> shape
+        applied to <em>token budgets</em>, behind a discovery document any provider can serve.
+      </p>
+      <div class="table-scroll">
+        <table class="tariff">
+          <thead>
+            <tr>
+              <th></th>
+              <th>OpenAI / Claude API</th>
+              <th>OpenRouter</th>
+              <th>“Paste your key” apps</th>
+              <th class="tpx-col">TPX</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>Who pays for inference</th>
+              <td>The app developer</td>
+              <td>The app developer<span class="fn">*</span></td>
+              <td>The user</td>
+              <td class="tpx-col">The user</td>
+            </tr>
+            <tr>
+              <th>What the app holds</th>
+              <td>A raw vendor key</td>
+              <td>A raw aggregator key</td>
+              <td>The user’s raw key</td>
+              <td class="tpx-col">A scoped, budgeted grant</td>
+            </tr>
+            <tr>
+              <th>Per-app spend cap</th>
+              <td>No — key spends freely</td>
+              <td>Per-key limits, set by the dev</td>
+              <td>No — key spends freely</td>
+              <td class="tpx-col">Yes — user-approved budget</td>
+            </tr>
+            <tr>
+              <th>User revocation</th>
+              <td>N/A — user has nothing</td>
+              <td>N/A — user has nothing</td>
+              <td>Rotate the key everywhere</td>
+              <td class="tpx-col">One click, one app</td>
+            </tr>
+            <tr>
+              <th>Provider choice</th>
+              <td>That vendor</td>
+              <td>One aggregator, many models</td>
+              <td>Whatever the app hardcoded</td>
+              <td class="tpx-col">Any issuer of <code>/.well-known/tpx</code></td>
+            </tr>
+            <tr>
+              <th>What the app learns about you</th>
+              <td>Whatever it collects</td>
+              <td>Whatever it collects</td>
+              <td>Your key = your account</td>
+              <td class="tpx-col">Nothing — grants are pseudonymous</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted fn-note">
+        * OpenRouter also sells credits to end users, but an app still integrates it with the
+        developer’s key — there’s no per-app consent, budget, or revocation flow.
+      </p>
+      <div class="honesty">
+        <article>
+          <h3>Genuinely new here</h3>
+          <p>
+            The authorization flow itself: a user approves a <strong>metered token budget </strong>
+            for one app, the grant is a damage cap rather than a payment, and it’s revocable
+            without touching any other app. And the flow is <strong>provider-agnostic</strong> —
+            apps hardcode the protocol, not the vendor.
+          </p>
+        </article>
+        <article>
+          <h3>Deliberately borrowed</h3>
+          <p>
+            The API surface is OpenAI’s, on purpose — your SDK already works. The consent
+            choreography is OAuth’s, on purpose — every developer already knows it. Vendor
+            programs like “Sign in with ChatGPT” bill an app’s usage to a user’s subscription,
+            but only inside one vendor’s walls; TPX is that idea with the walls removed.
+          </p>
+        </article>
+      </div>
+    </section>
+
     <section id="developers" class="wrap devs">
       <p class="eyebrow">For developers</p>
       <h2>Point your existing SDK at the pony.</h2>
@@ -426,6 +519,92 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     color: var(--muted);
   }
 
+  /* Comparison */
+  .compare {
+    padding-block: clamp(3rem, 7vw, 5rem) 0;
+  }
+
+  .compare h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+    margin-top: 2rem;
+    border: 1.5px solid var(--ink);
+    border-radius: 6px;
+    background: var(--card);
+  }
+
+  .tariff {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 46rem;
+    font-size: 0.9rem;
+  }
+
+  .tariff th,
+  .tariff td {
+    text-align: left;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  .tariff thead th {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .tariff tbody th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--muted);
+    max-width: 11rem;
+  }
+
+  .tariff tbody tr:last-child th,
+  .tariff tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .tpx-col {
+    background: #eef1fa;
+    border-left: 2px solid var(--blue);
+    font-weight: 500;
+  }
+
+  .fn {
+    color: var(--red);
+  }
+
+  .fn-note {
+    font-size: 0.82rem;
+    margin-top: 0.6rem;
+  }
+
+  .honesty {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: 2rem;
+  }
+
+  .honesty h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.5rem;
+    color: var(--red);
+  }
+
+  .honesty p {
+    color: var(--muted);
+    font-size: 0.97rem;
+  }
+
   /* Developers */
   .devs {
     padding-block: clamp(3rem, 7vw, 5rem) 0;
@@ -466,7 +645,8 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
       right: 0.2rem;
     }
 
-    .why-grid {
+    .why-grid,
+    .honesty {
       grid-template-columns: 1fr;
     }
 
