@@ -118,3 +118,25 @@ export function creditsFor(price: ModelPrice, t: TokenCounts): number {
 }
 
 export const usd = (credits: number) => `$${(credits / 1_000_000).toFixed(credits < 10_000 ? 4 : 2)}`;
+
+// -- TPX-A budget amount <-> credits (seam contract section 6) ----------------
+// 1 credit = US$0.000001, so credits = amount * 1_000_000, exact both ways.
+const MAX_CREDITS = 9_007_199_254_740_991; // 2^53 - 1
+
+/** Parse a USD decimal amount string into credits. Throws on malformed input. */
+export function amountToCredits(amount: string): number {
+  if (!/^\d+(\.\d{1,6})?$/.test(amount)) throw new Error('amount must be a USD decimal, <= 6 places');
+  const [whole, frac = ''] = amount.split('.');
+  const micro = frac.padEnd(6, '0');
+  const credits = Number(whole) * 1_000_000 + Number(micro);
+  if (!Number.isSafeInteger(credits) || credits < 1 || credits > MAX_CREDITS)
+    throw new Error('amount out of range');
+  return credits;
+}
+
+/** Format credits back to a USD decimal string (6 places, trimmed). */
+export function creditsToAmount(credits: number): string {
+  const whole = Math.floor(credits / 1_000_000);
+  const frac = String(credits % 1_000_000).padStart(6, '0').replace(/0+$/, '');
+  return frac ? `${whole}.${frac}` : `${whole}`;
+}

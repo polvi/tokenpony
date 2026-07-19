@@ -5,6 +5,8 @@ import { verifyDpopProof } from './dpop';
 import { MODELS, resolveModel, type ModelEntry } from './models';
 import { creditsFor, getPrices, priceFor, type ModelPrice, type TokenCounts } from './pricing';
 import { estimateTokens, jsonError, sha256Hex } from './util';
+import { commit, missionModels, release, reserve } from './aauth/missions';
+import { authenticateAAuth, aauthUnauthorized, buildAAuthChallenge } from './aauth/verify';
 import type { AppEnv } from './types';
 
 interface ChatMessage {
@@ -17,15 +19,17 @@ interface ChatRequest {
   messages: ChatMessage[];
   stream?: boolean;
   max_tokens?: number;
+  max_completion_tokens?: number;
   temperature?: number;
 }
 
-/** Who is spending: a personal key or a TPX grant. Amounts are credits (micro-USD). */
+/** Who is spending: a personal key, a TPX grant, or an AAuth mission. Credits (micro-USD). */
 interface Spender {
   userId: string;
   balance: number;
   apiKeyId?: string;
   grant?: { id: string; remaining: number; models?: string[] | null };
+  mission?: { id: string; remaining: number; models: string[] | null };
 }
 
 /** RFC 6750/9728 challenge on 401s so clients can bootstrap discovery. */
@@ -46,8 +50,38 @@ function unauthorized(c: Context<AppEnv>, message: string, invalidToken = true):
   );
 }
 
+async function authenticateAAuthSpender(c: Context<AppEnv>): Promise<Spender | Response> {
+  const auth = await authenticateAAuth(c);
+  if (auth.kind === 'none') return unauthorized(c, 'Missing access token', false);
+  if (auth.kind === 'error') return aauthUnauthorized(c, auth.code, auth.message);
+  const m = auth.mission;
+  if (m.user_id === null) {
+    const fundingUrl = `${c.env.ISSUER}/fund?approver=${encodeURIComponent(m.approver)}&s256=${encodeURIComponent(m.s256)}`;
+    return Response.json(
+      {
+        error: { code: 'mission_unfunded', message: 'this mission has no funding account yet' },
+        funding_url: fundingUrl,
+      },
+      { status: 402 },
+    );
+  }
+  const user = await c.env.DB.prepare('SELECT balance_credits FROM users WHERE id = ?')
+    .bind(m.user_id)
+    .first<{ balance_credits: number }>();
+  if (!user) return jsonError(402, 'balance_exhausted', 'funding account not found');
+  return {
+    userId: m.user_id,
+    balance: user.balance_credits,
+    mission: { id: m.id, remaining: m.budget_total - m.budget_used - m.reserved, models: missionModels(m) },
+  };
+}
+
 async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
   const header = c.req.header('authorization') ?? '';
+  // AAuth (TPX-A): budgeted auth token in `Authorization: AAuth <jwt>`.
+  if (/^AAuth\s+/i.test(header)) return authenticateAAuthSpender(c);
+  // Agent-signed request with no auth token yet -> resource-token challenge.
+  if (!header && c.req.header('signature-key')) return buildAAuthChallenge(c);
   const token = header.replace(/^(Bearer|DPoP)\s+/i, '').trim();
   if (!token) return unauthorized(c, 'Missing access token', false);
   const hash = await sha256Hex(token);
@@ -130,6 +164,7 @@ async function debit(
   model: string,
   counts: TokenCounts,
   credits: number,
+  reserved?: number,
 ): Promise<void> {
   const stmts = [
     c.env.DB.prepare('UPDATE users SET balance_credits = balance_credits - ? WHERE id = ?').bind(
@@ -160,6 +195,10 @@ async function debit(
     );
   }
   await c.env.DB.batch(stmts);
+  // AAuth mission: commit the actual charge against the reservation, release the rest.
+  if (spender.mission && reserved !== undefined) {
+    await commit(c.env.DB, spender.mission.id, reserved, credits);
+  }
   // Refill the balance off-session if the user opted into auto top-off.
   c.executionCtx.waitUntil(maybeAutoTopup(c.env, spender.userId));
 }
@@ -260,11 +299,11 @@ api.get('/models', async (c) => {
           usd_per_m_input_tokens: p.inputPerM,
           usd_per_m_cached_input_tokens: p.cachedInputPerM,
           usd_per_m_output_tokens: p.outputPerM,
-          // TPX v0.2 Section 4.3: per-token rates in credits.
+          // TPX-A section 4.3: per-token rates in credits, as strings.
           credits_per_token: {
-            input: p.inputPerM,
-            cached_input: p.cachedInputPerM,
-            output: p.outputPerM,
+            input: String(p.inputPerM),
+            cached_input: String(p.cachedInputPerM),
+            output: String(p.outputPerM),
           },
           source: prices[m.cf] ? 'cloudflare_catalog' : 'static',
         })),
@@ -289,20 +328,49 @@ api.post('/chat/completions', async (c) => {
   const model = resolveModel(body.model);
   if (!model)
     return jsonError(404, 'model_not_found', `Unknown model '${body.model}'; see /v1/models`);
-  if (spender.grant?.models && !spender.grant.models.includes(model.id))
-    return jsonError(403, 'model_not_permitted', `This grant is limited to: ${spender.grant.models.join(', ')}`);
+  // Model restriction. The AAuth path uses TPX-A's code `model_not_allowed`.
+  const restrictModels = spender.mission?.models ?? spender.grant?.models ?? null;
+  if (restrictModels && !restrictModels.includes(model.id))
+    return jsonError(
+      403,
+      spender.mission ? 'model_not_allowed' : 'model_not_permitted',
+      `This grant is limited to: ${restrictModels.join(', ')}`,
+    );
 
   const price = await priceFor(c.env, model.cf);
 
+  // AAuth requests MUST bound their cost (reservation basis).
+  const maxReq = body.max_completion_tokens ?? body.max_tokens;
+  if (spender.mission && maxReq === undefined)
+    return jsonError(400, 'max_tokens_required', 'AAuth requests must send max_completion_tokens');
+
   // Cap the completion to what the spender can still afford at this model's
   // output rate (credits per token equals USD per M tokens).
-  const affordableCredits = Math.min(spender.grant?.remaining ?? Infinity, spender.balance);
+  const affordableCredits = Math.min(
+    spender.grant?.remaining ?? Infinity,
+    spender.mission?.remaining ?? Infinity,
+    spender.balance,
+  );
   const affordableOutput = Math.floor(affordableCredits / price.outputPerM);
-  const maxTokens = Math.max(16, Math.min(body.max_tokens ?? 2048, affordableOutput, 8192));
+  const maxTokens = Math.max(16, Math.min(maxReq ?? 2048, affordableOutput, 8192));
   const promptText = body.messages.map((m) => m.content).join('\n');
 
+  // Reserve the worst-case charge before inference (AAuth path, seam contract section 6).
+  let reserved: number | undefined;
+  if (spender.mission) {
+    reserved = creditsFor(price, {
+      prompt_tokens: estimateTokens(promptText),
+      cached_tokens: 0,
+      completion_tokens: maxTokens,
+    });
+    if (reserved > spender.balance)
+      return jsonError(402, 'balance_exhausted', "The funder's balance can't cover this request");
+    if (!(await reserve(c.env.DB, spender.mission.id, reserved)))
+      return jsonError(402, 'budget_exhausted', 'This grant cannot cover the requested maximum cost.');
+  }
+
   if (body.stream) {
-    return streamCompletion(c, spender, model, price, body, maxTokens, promptText);
+    return streamCompletion(c, spender, model, price, body, maxTokens, promptText, reserved);
   }
 
   const aiInput =
@@ -323,13 +391,14 @@ api.post('/chat/completions', async (c) => {
     )) as Record<string, unknown>;
   } catch (err) {
     console.log(JSON.stringify({ event: 'ai_error', model: model.cf, error: String(err) }));
+    if (spender.mission && reserved !== undefined) await release(c.env.DB, spender.mission.id, reserved);
     return jsonError(502, 'upstream_error', `Inference failed: ${String(err)}`);
   }
 
   const content = model.api === 'chat' ? chatContent(result) : fromResponsesOutput(result);
   const counts = normalizeCounts(result.usage, promptText, content);
   const credits = creditsFor(price, counts);
-  await debit(c, spender, model.id, counts, credits);
+  await debit(c, spender, model.id, counts, credits, reserved);
   return c.json({
     id: `chatcmpl-${crypto.randomUUID()}`,
     object: 'chat.completion',
@@ -348,6 +417,7 @@ async function streamCompletion(
   body: ChatRequest,
   maxTokens: number,
   promptText: string,
+  reserved?: number,
 ): Promise<Response> {
   const aiInput =
     model.api === 'chat'
@@ -363,6 +433,7 @@ async function streamCompletion(
     )) as unknown as ReadableStream;
   } catch (err) {
     console.log(JSON.stringify({ event: 'ai_error', model: model.cf, error: String(err) }));
+    if (spender.mission && reserved !== undefined) await release(c.env.DB, spender.mission.id, reserved);
     return jsonError(502, 'upstream_error', `Inference failed: ${String(err)}`);
   }
 
@@ -436,7 +507,7 @@ async function streamCompletion(
   c.executionCtx.waitUntil(
     done.then(() => {
       const counts = normalizeCounts(reportedUsage, promptText, completionText);
-      return debit(c, spender, model.id, counts, creditsFor(price, counts));
+      return debit(c, spender, model.id, counts, creditsFor(price, counts), reserved);
     }),
   );
 

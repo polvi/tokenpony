@@ -21,6 +21,13 @@ export async function sweepExpired(env: Bindings): Promise<Record<string, number
     refresh_tokens: env.DB.prepare(
       "DELETE FROM refresh_tokens WHERE status != 'active' AND created_at <= datetime('now', '-7 days')",
     ),
+    // AAuth ephemera (epoch-seconds expiries): RFC 9421 replay guard, single-use
+    // attestation jtis, and expired budgeted auth tokens.
+    aauth_replay: env.DB.prepare("DELETE FROM aauth_replay WHERE expires_at <= unixepoch('now')"),
+    aauth_attestations: env.DB.prepare(
+      "DELETE FROM aauth_attestations WHERE expires_at <= unixepoch('now')",
+    ),
+    aauth_tokens: env.DB.prepare("DELETE FROM aauth_tokens WHERE expires_at <= unixepoch('now')"),
   };
   const results = await env.DB.batch(Object.values(stmts));
   const swept: Record<string, number> = {};

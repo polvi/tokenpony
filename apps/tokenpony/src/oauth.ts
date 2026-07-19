@@ -6,6 +6,7 @@ import { grantTuples, writeTuples } from './authz';
 import { loginRedirect, ensureUser, whoami } from './auth';
 import { MODELS } from './models';
 import { verifyDpopProof } from './dpop';
+import { handleBudgetRelay } from './aauth/relay';
 import type { AppEnv, Bindings } from './types';
 
 // Budgets are credits (micro-USD): cap a single grant at $10.
@@ -27,6 +28,8 @@ export function protectedResourceMetadata(issuer: string) {
     resource: issuer,
     authorization_servers: [issuer],
     bearer_methods_supported: ['header'],
+    // TPX-A (seam contract section 8): the AAuth budget-state endpoint.
+    budget_endpoint: `${issuer}/grant`,
   };
 }
 
@@ -448,6 +451,12 @@ async function pkceMatches(verifier: string, challenge: string): Promise<boolean
 }
 
 oauth.post('/token', async (c) => {
+  // AAuth budget relay (JSON body) rides on the same endpoint (seam contract
+  // section 4: the resource token's aud is this /token URL). Form-encoded bodies
+  // fall through to the standard OAuth 2.1 grant flows below.
+  const relay = await handleBudgetRelay(c);
+  if (relay) return relay;
+
   const form = Object.fromEntries(
     Object.entries(await c.req.parseBody()).map(([k, v]) => [k, String(v)]),
   );

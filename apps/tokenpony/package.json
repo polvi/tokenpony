@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@tokenpony/tpx": "workspace:*",
-    "hono": "^4"
+    "hono": "^4",
+    "jose": "^6.2.3"
   },
   "devDependencies": {
     "typescript": "^5",

@@ -4,6 +4,7 @@ import { oauth, authorizationServerMetadata, protectedResourceMetadata } from '.
 import { dashboard } from './dashboard';
 import { billing } from './billing';
 import { sweepExpired } from './sweeper';
+import { aauth, aauthResourceMetadata } from './aauth/routes';
 import { jsonError } from './util';
 import type { AppEnv, Bindings } from './types';
 
@@ -15,20 +16,21 @@ app.onError((err, c) => {
 });
 
 // CORS for the API and OAuth endpoints so browser apps can call them directly.
-const CORS_PATHS = /^\/(v1|models|chat|token|par|register|introspect|revoke|\.well-known)(\/|$)/;
+const CORS_PATHS = /^\/(v1|models|chat|token|par|register|introspect|revoke|grant|fund|\.well-known)(\/|$)/;
 app.use('*', async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     return c.body(null, 204, {
       'access-control-allow-origin': '*',
       'access-control-allow-methods': 'GET, POST, OPTIONS',
-      'access-control-allow-headers': 'authorization, content-type, dpop',
+      'access-control-allow-headers':
+        'authorization, content-type, dpop, signature, signature-input, signature-key, aauth-mission',
       'access-control-max-age': '86400',
     });
   }
   await next();
   if (CORS_PATHS.test(new URL(c.req.url).pathname)) {
     c.res.headers.set('access-control-allow-origin', '*');
-    c.res.headers.set('access-control-expose-headers', 'www-authenticate, dpop-nonce');
+    c.res.headers.set('access-control-expose-headers', 'www-authenticate, dpop-nonce, aauth-requirement');
   }
 });
 
@@ -40,11 +42,15 @@ app.get('/.well-known/oauth-protected-resource', (c) =>
 app.get('/.well-known/oauth-authorization-server', (c) =>
   c.json(authorizationServerMetadata(c.env.ISSUER)),
 );
+app.get('/.well-known/aauth-resource.json', async (c) =>
+  c.json(await aauthResourceMetadata(c.env), 200, { 'cache-control': 'no-store' }),
+);
 // Spec Section 8.2: API endpoints are relative to the resource identifier.
 // /v1 stays as the OpenAI-SDK-compatible alias.
 app.route('/v1', api);
 app.route('/', api);
 app.route('/', oauth);
+app.route('/', aauth);
 app.route('/dashboard', dashboard);
 app.route('/billing', billing);
 
