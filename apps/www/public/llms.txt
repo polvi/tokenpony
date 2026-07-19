@@ -139,3 +139,34 @@ Users can mint personal keys (sk_...) in the dashboard and use them directly aga
 MUST: PKCE S256; validate iss; exact redirect_uris; request and read budgets via
 authorization_details; on 401 refresh, on invalid_grant re-authorize.
 SHOULD: use PAR and DPoP; introspect before large jobs; revoke unneeded grants.
+
+## Agents: AAuth-Budget / TPX-A (identity-free budgeted access)
+
+Beyond the OAuth flow above, tokenpony is an AAuth resource + access server (the TPX-A
+profile of AAuth-Budget). An autonomous agent with its own Ed25519 identity gets a metered,
+identity-free budget that a person approves at their own Person Server (PS). tokenpony is
+both the resource and the access server; the PS relays the approved budget.
+
+Discovery: GET {resource}/.well-known/aauth-resource.json -> { resource, jwks, budget_endpoint,
+token_endpoint, signature_algorithms_supported: ["ed25519"] }. Ed25519 only.
+
+Flow (agent side):
+1. The agent hits {resource}/chat/completions RFC 9421-signed (Signature-Key carries its
+   aa-agent+jwt) with no auth token -> 401 + `AAuth-Requirement: requirement=auth-token;
+   resource-token="<aa-resource+jwt>"`.
+2. The agent takes that resource-token to its PS; the PS (after the person approves a budgeted
+   mission) relays to {resource}/token as JSON {resource_token, agent_token, budget_attestation}
+   and returns { auth_token, token_type:"AAuth", expires_in, funded, funding_url? }.
+3. The agent calls {resource}/chat/completions with `Authorization: AAuth <auth_token>` plus an
+   RFC 9421 signature over `@method @authority @path signature-key authorization` (Authorization
+   MUST be covered). Send max_completion_tokens (reservation bound). Usage reports credits_charged.
+   Budget is credits (amount USD x 1_000_000); 1 credit = US$0.000001.
+4. GET {resource}/grant (signed) -> { active, budget, spent, credits, credits_used }.
+
+Errors: 401 invalid_token / mission_revoked|completed|expired; 402 budget_exhausted |
+balance_exhausted | mission_unfunded (+funding_url); 403 model_not_allowed; 400 max_tokens_required.
+
+Funding: a budgeted mission is a cap + proof of consent, not payment. Until a tokenpony user
+claims it via funding_url, inference returns 402 mission_unfunded. Any https PS is accepted
+(trust is funding-gated). Full profile: https://tokenpony.dev/spec and the TPX-A draft
+(draft-mcguinness-aauth-budget).

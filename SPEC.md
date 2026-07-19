@@ -440,9 +440,27 @@ An **app** MUST: use PKCE; validate `iss`; register exact redirect URIs; request
 | Nested error body at OAuth endpoints | Flat RFC 6749 errors at OAuth endpoints; nested body kept at the inference API |
 | Dashboard-only revocation | Dashboard + RFC 7009 for apps |
 
+## Appendix B. TPX-A: the AAuth-Budget profile (for agents)
+
+TPX v0.2 authorizes apps acting for a signed-in person. For autonomous **agents** that carry
+their own cryptographic identity, tokenpony also implements **TPX-A**, the Token Pony Express
+binding of the AAuth-Budget extension (draft-mcguinness-aauth-budget) on top of AAuth
+(draft-hardt-oauth-aauth-protocol). It runs alongside this OAuth flow on the same metering
+core; the difference is the authorization envelope.
+
+Under TPX-A the provider is an AAuth resource plus access server. An agent (Ed25519 identity,
+RFC 9421 HTTP Message Signatures) is granted an identity-free, budget-bearing `aa-auth+jwt`
+that a person approves as a budgeted **mission** at their Person Server; the PS relays the
+approved budget to the provider's `/token`, which mints the token, and the agent spends it at
+the same OpenAI-compatible inference API. Budgets are the same credits as here (1 credit =
+US$0.000001), metered mission-keyed with reservation, and revocable. Discovery is
+`/.well-known/aauth-resource.json` (with `budget_endpoint`), distinct from the OAuth metadata
+above. See the agent guide at [tokenpony.dev/llms.txt](https://tokenpony.dev/llms.txt).
+
 ## References
 
 RFC 2119, RFC 6749, RFC 6750, RFC 7009, RFC 7591, RFC 7636, RFC 7662,
 RFC 8174, RFC 8414, RFC 8707, RFC 9068, RFC 9126, RFC 9207, RFC 9396,
-RFC 9449, RFC 9728, draft-ietf-oauth-v2-1,
-draft-ietf-oauth-client-id-metadata-document.
+RFC 9421, RFC 9449, RFC 9728, RFC 7638, draft-ietf-oauth-v2-1,
+draft-ietf-oauth-client-id-metadata-document, draft-hardt-oauth-aauth-protocol,
+draft-mcguinness-aauth-budget.
