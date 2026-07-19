@@ -23,19 +23,15 @@ function isBlockedHost(host: string): boolean {
   return false;
 }
 
-/** Fetch (and cache) a JWKS from an AAuth well-known doc. Returns [] on failure. */
-export async function fetchWellKnownJwks(issuer: string, doc: string): Promise<JWK[]> {
+/** SSRF-guarded GET of a small JSON doc. Returns null on any failure. */
+async function fetchJson(target: string): Promise<Record<string, unknown> | null> {
   let url: URL;
   try {
-    url = new URL(`/.well-known/${doc}`, issuer);
+    url = new URL(target);
   } catch {
-    return [];
+    return null;
   }
-  if (url.protocol !== 'https:' || isBlockedHost(url.hostname)) return [];
-
-  const hit = cache.get(url.href);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.keys;
-
+  if (url.protocol !== 'https:' || isBlockedHost(url.hostname)) return null;
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -43,20 +39,35 @@ export async function fetchWellKnownJwks(issuer: string, doc: string): Promise<J
     // open-redirect could otherwise dodge the SSRF host guard).
     const res = await fetch(url, { signal: ctrl.signal, redirect: 'manual' });
     clearTimeout(timer);
-    if (res.status >= 300 && res.status < 400) return hit?.keys ?? [];
-    if (!res.ok) return hit?.keys ?? [];
+    if (res.status >= 300 || !res.ok) return null;
     const buf = await res.arrayBuffer();
-    if (buf.byteLength > MAX_BYTES) return hit?.keys ?? [];
-    const parsed = JSON.parse(new TextDecoder().decode(buf)) as {
-      keys?: JWK[];
-      jwks?: { keys?: JWK[] };
-    };
-    const keys = parsed.keys ?? parsed.jwks?.keys ?? [];
-    if (keys.length) cache.set(url.href, { at: Date.now(), keys });
-    return keys.length ? keys : (hit?.keys ?? []);
+    if (buf.byteLength > MAX_BYTES) return null;
+    return JSON.parse(new TextDecoder().decode(buf)) as Record<string, unknown>;
   } catch {
-    return hit?.keys ?? []; // serve stale on error
+    return null;
   }
+}
+
+/**
+ * Fetch (and cache) a JWKS from an AAuth well-known doc. Keys may be inline
+ * (`keys`) or referenced by `jwks_uri` (seam contract section 8); we follow the
+ * URI when there are no inline keys. Returns [] on failure.
+ */
+export async function fetchWellKnownJwks(issuer: string, doc: string): Promise<JWK[]> {
+  const wellKnown = `${issuer.replace(/\/$/, '')}/.well-known/${doc}`;
+  const hit = cache.get(wellKnown);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.keys;
+
+  const meta = await fetchJson(wellKnown);
+  if (!meta) return hit?.keys ?? [];
+
+  let keys = (meta.keys as JWK[] | undefined) ?? (meta.jwks as { keys?: JWK[] } | undefined)?.keys ?? [];
+  if (keys.length === 0 && typeof meta.jwks_uri === 'string') {
+    const jwks = await fetchJson(meta.jwks_uri);
+    keys = (jwks?.keys as JWK[] | undefined) ?? [];
+  }
+  if (keys.length) cache.set(wellKnown, { at: Date.now(), keys });
+  return keys.length ? keys : (hit?.keys ?? []);
 }
 
 /** The PS's signing JWKS (verifies budget attestations). */
