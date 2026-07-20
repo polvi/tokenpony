@@ -41,13 +41,14 @@ const steps = [
   <main>
     <section class="hero wrap">
       <div class="hero-copy">
-        <p class="eyebrow">TPX v0.2 · an OAuth profile + reference provider · proof of concept</p>
-        <h1>Bring your own tokens to any LLM&nbsp;app.</h1>
+        <p class="eyebrow">TPX v0.2 · an OAuth &amp; AAuth profile + reference provider · proof of concept</p>
+        <h1>Bring your own tokens to any LLM app <span class="or">or agent</span>.</h1>
         <p class="lede">
-          tokenpony is two things: the home of <strong>TPX</strong>, an OAuth 2.0 profile for
-          metered inference grants: apps ship without API keys and you pay a token provider
-          you choose. tokenpony is also the reference provider implementing it end to end. The app gets a metered budget. You
-          keep the reins.
+          tokenpony is the home of <strong>TPX</strong>, an OAuth 2.0 profile where apps ship without
+          API keys and you pay a token provider you choose, and its <strong>TPX-A</strong> profile, where
+          autonomous agents carry their own identity and spend a budget you approve. tokenpony is also
+          the reference provider implementing both end to end. The app, or agent, gets a metered budget.
+          You keep the reins.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
@@ -137,6 +138,56 @@ $ curl https://api.tokenpony.dev\
           ))
         }
       </ol>
+    </section>
+
+    <section id="agents" class="agents">
+      <div class="wrap">
+        <p class="eyebrow">For agents · TPX-A</p>
+        <h2>Apps act for a person.<br />Agents can act for themselves.</h2>
+        <p class="section-lede">
+          The flow above is for apps a person is signed into. Autonomous agents are different:
+          they carry their own cryptographic identity. So tokenpony also speaks <strong>TPX-A</strong>,
+          our binding of <a href="https://aauth.dev">AAuth</a> (Dick Hardt's agent-authorization
+          protocol) and its AAuth-Budget extension. An agent gets a metered, identity-free budget
+          that a person approves at a Person Server they choose. Same credits, same models, same
+          meter as the rest of tokenpony.
+        </p>
+        <div class="agent-grid">
+          <article>
+            <span class="agent-n" aria-hidden="true">A</span>
+            <h3>The agent has its own keys</h3>
+            <p>
+              An Ed25519 identity published at a well-known URL, proving possession on every
+              request with HTTP Message Signatures. No shared secret, no pasted API key, no
+              app impersonating the agent.
+            </p>
+          </article>
+          <article>
+            <span class="agent-n" aria-hidden="true">B</span>
+            <h3>A person approves a budget</h3>
+            <p>
+              The person grants a budgeted <em>mission</em> at their Person Server, capped in
+              credits and limited to chosen models. tokenpony issues a token that carries the
+              budget and <strong>no identity</strong>. <a href="https://authgravity.tokenpony.dev">AuthGravity</a> is the
+              reference Person Server.
+            </p>
+          </article>
+          <article>
+            <span class="agent-n" aria-hidden="true">C</span>
+            <h3>The budget is a cap, not a blank cheque</h3>
+            <p>
+              A mission is a damage cap plus proof of consent, not a payment. Spend draws from a
+              tokenpony account that backs it, up to the cap, revocable any time. A leaked agent
+              token can spend at most what's left.
+            </p>
+          </article>
+        </div>
+        <p class="muted agent-out">
+          Standard AAuth: RFC 9421 signatures, RFC 9396 rich authorization, a resource that
+          publishes <code>/.well-known/aauth-resource.json</code>. Agent quickstart
+          in <a href="/llms.txt">llms.txt</a>; the profile is Appendix B of the <a href="/spec">spec</a>.
+        </p>
+      </div>
     </section>
 
     <section id="models" class="stable">
@@ -305,6 +356,11 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
   h1 {
     font-size: clamp(2.4rem, 5.5vw, 4rem);
     margin-block: 0.75rem 1.25rem;
+  }
+
+  h1 .or {
+    color: var(--red);
+    white-space: nowrap;
   }
 
   .lede {
@@ -485,6 +541,50 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
   .waybill p {
     max-width: var(--measure);
     color: var(--muted);
+  }
+
+  /* Agents / TPX-A */
+  .agents {
+    padding-block: clamp(3rem, 7vw, 5rem);
+  }
+
+  .agents h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+    line-height: 1.12;
+  }
+
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+  }
+
+  .agent-grid article {
+    border-top: 2px solid var(--ink);
+    padding-top: 1rem;
+  }
+
+  .agent-n {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    color: var(--red);
+  }
+
+  .agent-grid h3 {
+    font-size: 1.2rem;
+    margin: 0.4rem 0 0.5rem;
+  }
+
+  .agent-grid p {
+    color: var(--muted);
+    font-size: 0.97rem;
+  }
+
+  .agent-out {
+    margin-top: 2rem;
+    font-size: 0.92rem;
   }
 
   /* Stamp sheet */
@@ -680,7 +780,8 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     }
 
     .why-grid,
-    .claims {
+    .claims,
+    .agent-grid {
       grid-template-columns: minmax(0, 1fr);
     }
 
