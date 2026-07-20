@@ -24,10 +24,12 @@ Agents integrate from `GET /.well-known/oauth-protected-resource` → its `docum
 ```
 SPEC.md            TPX v0.2 protocol spec (source of truth; mirrored at /spec)
 packages/tpx/      @tokenpony/tpx client SDK (types, discover, authorize, exchange, chat)
+packages/tpx-provider/  shared TPX provider surface for the local shims
 apps/www/          Astro marketing site -> tokenpony.dev
 apps/tokenpony/    provider Worker (Hono + D1 + Workers AI) -> api.tokenpony.dev
 apps/ponychat/     demo TPX client Worker (Hono + KV) -> ponychat.tokenpony.dev
 apps/tpx-local/    local TPX provider shim for Jan.ai (Bun server, run on your machine)
+apps/tpx-claude/   personal TPX provider shim for your own Claude Code login
 ```
 
 ## How money works
