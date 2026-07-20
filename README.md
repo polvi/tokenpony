@@ -27,6 +27,7 @@ packages/tpx/      @tokenpony/tpx client SDK (types, discover, authorize, exchan
 apps/www/          Astro marketing site -> tokenpony.dev
 apps/tokenpony/    provider Worker (Hono + D1 + Workers AI) -> api.tokenpony.dev
 apps/ponychat/     demo TPX client Worker (Hono + KV) -> ponychat.tokenpony.dev
+apps/tpx-local/    local TPX provider shim for Jan.ai (Bun server, run on your machine)
 ```
 
 ## How money works
