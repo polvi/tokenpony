@@ -1,8 +1,9 @@
 /**
- * @tokenpony/tpx: client SDK for the Token Pony Express (TPX) v0.2.
+ * @tokenpony/tpx: client SDK for the Token Pony Express (TPX) v0.3.
  *
- * TPX v0.2 is an OAuth 2.0 profile (OAuth 2.1 baseline) for metered LLM
- * inference grants. See https://tokenpony.dev/spec.
+ * TPX v0.3 is an OAuth 2.0 profile (OAuth 2.1 baseline) for metered LLM
+ * inference grants. All money on the wire is USD. See
+ * https://tokenpony.dev/spec.
  */
 
 export interface ProtectedResourceMetadata {
@@ -30,6 +31,7 @@ export interface TpxDiscovery {
 
 export interface LlmInferenceDetails {
   type: 'llm-inference';
+  /** Maximum spend under the grant, in USD (e.g. 0.10). */
   budget: number;
   models?: string[];
 }
@@ -48,7 +50,35 @@ export interface IntrospectionResponse {
   token_type?: string;
   exp?: number;
   authorization_details?: LlmInferenceDetails[];
+  /** USD spent under the grant so far. */
   budget_used?: number;
+}
+
+/** OpenRouter-shaped model pricing: USD per token as decimal strings, "0" = free. */
+export interface ModelPricing {
+  prompt: string;
+  completion: string;
+  request?: string;
+  input_cache_read?: string;
+  /** Provenance extension, e.g. 'cloudflare_catalog' | 'static' | 'local' | 'subscription'. */
+  source?: string;
+}
+
+export interface ModelEntry {
+  id: string;
+  object: 'model';
+  owned_by?: string;
+  description?: string;
+  pricing?: ModelPricing;
+}
+
+export interface CreditsResponse {
+  data: {
+    /** USD purchased (account view) or granted (grant view). */
+    total_purchased: number;
+    /** USD spent. */
+    total_used: number;
+  };
 }
 
 export interface ClientRegistration {
@@ -298,7 +328,25 @@ export interface ChatUsage {
   cached_tokens?: number;
   completion_tokens: number;
   total_tokens: number;
-  credits_charged?: number;
+  /** USD debited for this completion (0 on free providers). */
+  cost?: number;
+}
+
+/** Model list (with pricing) from `{resource}/models`. */
+export async function listModels(resource: string): Promise<ModelEntry[]> {
+  const res = await fetch(`${resource}/models`);
+  if (!res.ok) throw await readError(res);
+  const body = (await res.json()) as { data?: ModelEntry[] };
+  return body.data ?? [];
+}
+
+/** Spend summary for the presented credential from `{resource}/credits`, in USD. */
+export async function credits(resource: string, accessToken: string): Promise<CreditsResponse> {
+  const res = await fetch(`${resource}/credits`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw await readError(res);
+  return (await res.json()) as CreditsResponse;
 }
 
 /** Non-streaming chat completion against `{resource}/chat/completions`. */

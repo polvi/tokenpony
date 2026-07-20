@@ -1,5 +1,5 @@
 /**
- * @tokenpony/tpx-provider: the TPX v0.2 provider surface for local shims.
+ * @tokenpony/tpx-provider: the TPX v0.3 provider surface for local shims.
  *
  * Everything protocol-shaped lives here: RFC 9728/8414 discovery, RFC 7591
  * dynamic registration, PAR + PKCE + the llm-inference RAR type (fail-closed),
@@ -34,7 +34,9 @@ export interface StoredClient {
 export interface Grant {
   id: string;
   client_id: string;
+  /** Stored as integer micro-USD; the wire carries USD numbers (v0.3). */
   budget: number;
+  /** Integer micro-USD debited so far; introspection reports it in USD. */
   budget_used: number;
   models?: string[];
   refresh_token: string;
@@ -46,6 +48,14 @@ export interface Grant {
 interface State {
   clients: Record<string, StoredClient>;
   grants: Record<string, Grant>;
+}
+
+/** Metering seam handed to chatCompletions (amounts in USD on this surface). */
+export interface Meter {
+  /** USD still spendable under the grant. */
+  remainingUsd: number;
+  /** Debit a completion's cost in USD against the grant (0 is a valid no-op). */
+  debit: (costUsd: number) => void;
 }
 
 export interface TpxProviderOptions {
@@ -61,7 +71,9 @@ export interface TpxProviderOptions {
   approveGate?: (form: URLSearchParams) => boolean;
   /** Inference route handlers; chatCompletions receives the authenticated grant. */
   listModels: (c: Context) => Promise<Response> | Response;
-  chatCompletions: (c: Context, grant: Grant) => Promise<Response> | Response;
+  chatCompletions: (c: Context, grant: Grant, meter: Meter) => Promise<Response> | Response;
+  /** Override for GET /credits; the default reports the grant's own budget and spend. */
+  credits?: (c: Context, grant: Grant) => Promise<Response> | Response;
   /** Extra HTML paragraphs for the status page at GET /. */
   statusHtml?: (issuer: string) => string;
 }
@@ -111,8 +123,8 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 }
 
-/** Inject usage.credits_charged: 0 into SSE chunks that carry usage. */
-export function annotateSse(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+/** Inject usage.cost (USD) into SSE chunks that carry usage. */
+export function annotateSse(body: ReadableStream<Uint8Array>, costUsd = 0): ReadableStream<Uint8Array> {
   let buffer = '';
   const encoder = new TextEncoder();
   const annotateLine = (line: string): string => {
@@ -122,7 +134,7 @@ export function annotateSse(body: ReadableStream<Uint8Array>): ReadableStream<Ui
     try {
       const chunk = JSON.parse(payload) as { usage?: Record<string, unknown> };
       if (!chunk.usage) return line;
-      chunk.usage.credits_charged = 0;
+      chunk.usage.cost = costUsd;
       return `data: ${JSON.stringify(chunk)}`;
     } catch {
       return line;
@@ -152,7 +164,10 @@ export function annotateSse(body: ReadableStream<Uint8Array>): ReadableStream<Ui
     );
 }
 
-/** Parse an authorization_details value, failing closed per RFC 9396. */
+/**
+ * Parse an authorization_details value, failing closed per RFC 9396. The wire
+ * budget is a USD number (v0.3); the returned budget is integer micro-USD.
+ */
 function parseLlmInference(raw: string): { budget: number; models?: string[] } | { error: string } {
   let parsed: unknown;
   try {
@@ -166,11 +181,14 @@ function parseLlmInference(raw: string): { budget: number; models?: string[] } |
   if (d?.type !== 'llm-inference') return { error: 'authorization_details type must be llm-inference' };
   for (const key of Object.keys(d))
     if (!['type', 'budget', 'models'].includes(key)) return { error: `Unrecognized field '${key}'` };
-  if (typeof d.budget !== 'number' || !Number.isInteger(d.budget) || d.budget <= 0)
-    return { error: 'budget must be a positive integer' };
+  const b = d.budget;
+  // The epsilon absorbs binary float representation of <= 6-decimal values.
+  const micro = typeof b === 'number' && Number.isFinite(b) ? Math.round(b * 1_000_000) : NaN;
+  if (!Number.isFinite(micro) || (b as number) <= 0 || Math.abs((b as number) * 1_000_000 - micro) > 1e-3 || micro < 1)
+    return { error: 'budget must be a positive USD number with at most 6 decimal places' };
   if (d.models !== undefined && (!Array.isArray(d.models) || d.models.some((m) => typeof m !== 'string')))
     return { error: 'models must be an array of strings' };
-  return { budget: d.budget, models: d.models as string[] | undefined };
+  return { budget: micro, models: d.models as string[] | undefined };
 }
 
 // -- Provider factory ---------------------------------------------------------
@@ -235,7 +253,9 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
   }
 
   function grantedDetails(grant: Grant) {
-    return [{ type: 'llm-inference', budget: grant.budget, ...(grant.models && { models: grant.models }) }];
+    return [
+      { type: 'llm-inference', budget: grant.budget / 1_000_000, ...(grant.models && { models: grant.models }) },
+    ];
   }
 
   function issueTokens(grant: Grant) {
@@ -368,7 +388,7 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
     if (!found) return c.html('<p>Unknown or expired authorization request. Start over in the app.</p>', 400);
     const { id, pending } = found;
     const client = state.clients[pending.client_id];
-    const usd = (pending.budget / 1_000_000).toFixed(2);
+    const usd = `$${(pending.budget / 1_000_000).toFixed(pending.budget < 10_000 ? 4 : 2)}`;
     return c.html(`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Approve grant</title>
@@ -385,7 +405,7 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
 <div class="card">
   <h1>${escapeHtml(opts.title)}</h1>
   <p><b>${escapeHtml(client?.client_name ?? pending.client_id)}</b> requests an inference grant of
-  <b class="budget">${pending.budget.toLocaleString('en-US')}</b> credits ($${usd}).</p>
+  <b class="budget">${usd}</b>.</p>
   ${pending.models ? `<p>Limited to models: ${escapeHtml(pending.models.join(', '))}</p>` : ''}
   <p class="note">${escapeHtml(opts.consentNote)}</p>
   <form method="post" action="/authorize/decision"><input type="hidden" name="request" value="${id}"><input type="hidden" name="decision" value="approve">${opts.consentExtraHtml ?? ''}<button class="approve">Approve</button></form>
@@ -433,7 +453,7 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
       exp: Date.now() + CODE_TTL,
     });
     redirect.searchParams.set('code', code);
-    console.log(`granted ${grant.budget} credits to ${pending.client_id} (${grant.id})`);
+    console.log(`granted $${(grant.budget / 1_000_000).toFixed(2)} to ${pending.client_id} (${grant.id})`);
     return c.redirect(redirect.toString());
   });
 
@@ -495,7 +515,7 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
       token_type: 'Bearer',
       exp: Math.floor(ref.exp / 1000),
       authorization_details: grantedDetails(grant),
-      budget_used: grant.budget_used,
+      budget_used: grant.budget_used / 1_000_000,
     });
   });
 
@@ -534,6 +554,21 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
     return grant;
   }
 
+  /** Meter over a grant: integer micro-USD mutation, so floats never drift. */
+  function meterFor(grant: Grant): Meter {
+    return {
+      remainingUsd: Math.max(0, grant.budget - grant.budget_used) / 1_000_000,
+      debit(costUsd: number) {
+        // Round, not ceil: the cost originates from an integer micro amount,
+        // and float error would push ceil off by one.
+        const micro = Math.round(costUsd * 1_000_000);
+        if (micro <= 0) return;
+        grant.budget_used += micro;
+        saveState();
+      },
+    };
+  }
+
   // Spec 8.2: API endpoints are relative to the resource identifier; serve both
   // bare and /v1-prefixed paths like the reference provider.
   for (const prefix of ['', '/v1']) {
@@ -541,7 +576,23 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
     app.post(`${prefix}/chat/completions`, (c) => {
       const grant = authenticateBearer(c);
       if (grant instanceof Response) return grant;
-      return opts.chatCompletions(c, grant);
+      // Spec 8.4: refuse spend past the budget with 402 budget_exhausted.
+      if (grant.budget_used >= grant.budget)
+        return apiError(c, 402, 'budget_exhausted', 'Grant budget spent; request a new authorization');
+      return opts.chatCompletions(c, grant, meterFor(grant));
+    });
+    // Spec 8.2: spend summary for the presented credential, in USD. The
+    // default is grant-scoped: budget as total_purchased, spend as total_used.
+    app.get(`${prefix}/credits`, (c) => {
+      const grant = authenticateBearer(c);
+      if (grant instanceof Response) return grant;
+      if (opts.credits) return opts.credits(c, grant);
+      return c.json({
+        data: {
+          total_purchased: grant.budget / 1_000_000,
+          total_used: grant.budget_used / 1_000_000,
+        },
+      });
     });
   }
 

@@ -1,5 +1,5 @@
 /**
- * tpx-claude: a TPX v0.2 provider shim backed by your own Claude Code login.
+ * tpx-claude: a TPX v0.3 provider shim backed by your own Claude Code login.
  *
  * Personal use only. Each completion spawns headless Claude Code (`claude -p`)
  * on this machine, so requests draw on your Claude subscription through the
@@ -12,9 +12,8 @@
  * no settings, a replaced system prompt, and an empty working directory, so a
  * connected app can only ever get chat completions out of it.
  *
- * Subscription usage has no marginal price, so models publish zero credit
- * rates and completions report usage.credits_charged: 0 with real token
- * counts. The grant budget is a cap, not a payment.
+ * Subscription usage has no marginal price, so models publish zero USD
+ * rates and completions report usage.cost: 0 with real token counts. The grant budget is a cap, not a payment.
  */
 
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -25,6 +24,7 @@ import {
   createTpxProvider,
   randomToken,
   type Grant,
+  type Meter,
 } from '@tokenpony/tpx-provider';
 import type { Context } from 'hono';
 
@@ -156,7 +156,7 @@ function usageOf(result: StreamEventLine) {
     cached_tokens: u.cache_read_input_tokens ?? 0,
     completion_tokens,
     total_tokens: prompt_tokens + completion_tokens,
-    credits_charged: 0,
+    cost: 0,
   };
 }
 
@@ -224,11 +224,12 @@ let resolvedModels: VerifiedModel[] | null = null;
 
 // -- Inference handlers -------------------------------------------------------
 
+// OpenRouter pricing shape: USD per token as decimal strings, "0" = free.
 const ZERO_PRICING = {
-  usd_per_m_input_tokens: 0,
-  usd_per_m_cached_input_tokens: 0,
-  usd_per_m_output_tokens: 0,
-  credits_per_token: { input: '0', cached_input: '0', output: '0' },
+  prompt: '0',
+  completion: '0',
+  request: '0',
+  input_cache_read: '0',
   source: 'subscription',
 };
 
@@ -240,7 +241,7 @@ async function listModels(c: Context) {
   });
 }
 
-async function chatCompletions(c: Context, grant: Grant) {
+async function chatCompletions(c: Context, grant: Grant, meter: Meter) {
   let body: { model?: string; messages?: ChatMessage[]; stream?: boolean };
   try {
     body = await c.req.json();
@@ -256,6 +257,7 @@ async function chatCompletions(c: Context, grant: Grant) {
   if (!Array.isArray(body.messages) || body.messages.length === 0)
     return apiError(c, 400, 'invalid_request', 'messages is required');
 
+  meter.debit(0); // subscription inference; keeps the metering seam exercised
   const { system, prompt } = renderMessages(body.messages);
   const proc = spawnClaude(model, system, prompt);
   const id = `chatcmpl-${randomToken('')}`;
@@ -352,17 +354,17 @@ const app = createTpxProvider({
   statePath: STATE_PATH,
   title: 'tpx-claude',
   consentNote:
-    'This provider is one person’s own Claude subscription, gated by a PIN shown only in their terminal. Usage costs 0 credits; the budget is a cap, not a payment.',
+    'This provider is one person’s own Claude subscription, gated by a PIN shown only in their terminal. Usage costs $0; the budget is a cap, not a payment.',
   consentExtraHtml: '<input type="password" name="pin" placeholder="PIN from the terminal" required autocomplete="off"> ',
   approveGate: (form) => form.get('pin') === PIN,
   listModels,
   chatCompletions,
-  statusHtml: () => `<p>A TPX v0.2 provider backed by this machine’s own Claude Code login (headless
+  statusHtml: () => `<p>A TPX v0.3 provider backed by this machine’s own Claude Code login (headless
 <code>claude -p</code>, subscription auth handled entirely by the CLI). Personal use only: grant
 approval requires the PIN printed in the terminal, and spawned sessions have no tools, no MCP
 servers, and an empty working directory.</p>
 <p>Models: ${(resolvedModels ?? []).map((m) => `<code>${m.id}</code>`).join(', ') || 'verifying against this login, refresh shortly'}.
-All completions report <code>credits_charged: 0</code>.</p>`,
+All completions report <code>cost: 0</code>.</p>`,
 });
 
 console.log(`tpx-claude listening on http://localhost:${PORT}, verifying models: ${CANDIDATES.join(', ')}`);
