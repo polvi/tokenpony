@@ -76,6 +76,8 @@ const connectCss = `
   .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; margin-top:1.5rem; }
   .field { margin-block:.9rem; display:flex; flex-direction:column; gap:.35rem; }
   label { font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+  .hint { font-size:.78rem; color:var(--dim); }
+  .hint code { font-family:var(--mono); font-size:.72rem; color:var(--text); }
   .err { color:#ff8a7a; font-weight:600; margin-top:.75rem; }
 `;
 
@@ -85,6 +87,9 @@ const chatCss = `
   .msg.user { align-self:flex-end; background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:6px; font-weight:500; }
   .msg.assistant { align-self:flex-start; background:var(--surface2); border:1px solid var(--border); border-bottom-left-radius:6px; }
   .msg.error { align-self:center; background:#2a1714; border:1px solid #5c2a22; color:#ff9c8d; font-size:.9rem; border-radius:12px; }
+  #starters { flex:none; display:flex; gap:.5rem; flex-wrap:wrap; padding-top:.2rem; }
+  #starters button { background:var(--surface2); color:var(--text); border:1px solid var(--border); font-weight:500; font-size:.8rem; padding:.4rem .85rem; }
+  #starters button:hover { border-color:var(--accent); color:var(--accent); filter:none; }
   form#composer { flex:none; display:flex; gap:.6rem; padding-block:.8rem 1.3rem; }
   #prompt { flex:1; border-radius:999px; padding-inline:1.1rem; }
   .meter { font-family:var(--mono); font-size:.72rem; color:var(--dim); }
@@ -112,6 +117,11 @@ export function connectPage(defaultIssuer: string, error?: string): string {
       <div class="field">
         <label for="issuer">Token provider (any TPX issuer)</label>
         <input id="issuer" name="issuer" type="url" value="${esc(defaultIssuer)}" required>
+        <p class="hint">Hosted tokenpony is prefilled. Your laptop also speaks TPX:
+        run <a href="https://github.com/polvi/tokenpony/tree/main/apps/tpx-local" target="_blank" rel="noopener">tpx-local</a> (Jan.ai)
+        or <a href="https://github.com/polvi/tokenpony/tree/main/apps/tpx-claude" target="_blank" rel="noopener">tpx-claude</a> (your
+        own Claude Code login), tunnel it with <code>cloudflared tunnel --url http://localhost:1338</code>,
+        and paste the https URL here instead.</p>
       </div>
       <div class="field">
         <label for="budget">Budget to request (USD)</label>
@@ -151,7 +161,13 @@ export function chatPage(issuer: string, budget: number, used = 0): string {
 </header>
 <main>
   <div id="log">
-    <div class="msg assistant">Saddled up. Your provider grant is loaded. Ask me anything.</div>
+    <div class="msg assistant">Saddled up. Your provider grant is loaded. Ask me anything, and I know the trail: TPX, TPX-A and AAuth, or running a local provider with Jan or Claude Code.</div>
+  </div>
+  <div id="starters">
+    <button type="button" data-q="What is TPX and why do apps ship without API keys?">What is TPX?</button>
+    <button type="button" data-q="How do I use Jan.ai on my laptop as my token provider for Pony Chat?">Local models with Jan</button>
+    <button type="button" data-q="How do I chat here on my own Claude Code subscription with tpx-claude?">My Claude Code login</button>
+    <button type="button" data-q="What are TPX-A and AAuth, and how does an autonomous agent get a budget?">Agents and AAuth</button>
   </div>
   <form id="composer">
     <input id="prompt" autocomplete="off" placeholder="Write a message…" required>
@@ -195,6 +211,14 @@ fetch('/models').then(r => r.json()).then(body => {
   }
 }).catch(() => {});
 
+const starters = document.getElementById('starters');
+starters.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  promptEl.value = btn.dataset.q;
+  composer.requestSubmit();
+});
+
 function bubble(cls, text) {
   const div = document.createElement('div');
   div.className = 'msg ' + cls;
@@ -209,6 +233,7 @@ composer.addEventListener('submit', async (e) => {
   const text = promptEl.value.trim();
   if (!text) return;
   promptEl.value = '';
+  starters.hidden = true;
   bubble('user', text);
   history.push({ role: 'user', content: text });
   const out = bubble('assistant', '');

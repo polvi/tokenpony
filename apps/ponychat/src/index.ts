@@ -18,6 +18,7 @@ import {
   type TpxDiscovery,
 } from '@tokenpony/tpx';
 import { chatPage, connectPage } from './ui';
+import { GUIDE_SYSTEM_PROMPT } from './knowledge';
 
 type AppEnv = { Bindings: Env };
 
@@ -252,11 +253,14 @@ app.post('/chat', async (c) => {
   let { grant, refreshed } = fresh;
 
   const body = await c.req.json<{ model: string; messages: unknown[] }>();
+  // Pony Chat doubles as the TPX guide: the knowledge prompt rides along on
+  // every request, whichever provider (hosted or local shim) serves it.
+  const messages = [{ role: 'system', content: GUIDE_SYSTEM_PROMPT }, ...body.messages];
   const upstream = () =>
     fetch(`${grant.resource}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${grant.at}` },
-      body: JSON.stringify({ model: body.model, messages: body.messages, stream: true }),
+      body: JSON.stringify({ model: body.model, messages, stream: true }),
     });
 
   let res = await upstream();

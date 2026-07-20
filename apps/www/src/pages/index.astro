@@ -45,7 +45,8 @@ const steps = [
         <h1>Bring your own tokens to any LLM app.</h1>
         <p class="lede">
           tokenpony is the home of <strong>TPX</strong>, an OAuth 2.0 profile where apps ship without
-          API keys and you pay a token provider you choose. tokenpony is also the reference provider
+          API keys and you pay a token provider you choose, hosted or <a href="#local">running on your
+          own laptop</a>. tokenpony is also the reference provider
           implementing it end to end. The app gets a metered budget. You keep the reins. (For
           autonomous agents there is <strong>TPX-A</strong>, an experimental extension described below.)
         </p>
@@ -214,6 +215,45 @@ $ curl https://api.tokenpony.dev\
           }
         </ul>
       </div>
+    </section>
+
+    <section id="local" class="wrap local">
+      <p class="eyebrow">Hosted or local</p>
+      <h2>One protocol, from our cloud to your laptop.</h2>
+      <p class="section-lede">
+        A TPX provider is anything with a discovery document, including a process on your own
+        machine. The <a href="https://github.com/polvi/tokenpony">open-source repo</a> ships two
+        local provider shims; point Pony Chat (or any TPX client) at either one and the whole
+        flow works unchanged: same consent page, same budget, same meter. Local inference is
+        free, so completions report <code>usage.cost: 0</code> and the budget is a cap that
+        never depletes.
+      </p>
+      <div class="local-grid">
+        <article>
+          <h3>tpx-local · Jan.ai</h3>
+          <p>
+            Fronts any local OpenAI-compatible server, built for <a href="https://jan.ai">Jan.ai</a>.
+            Enable Jan's local API server and every model on your machine becomes a TPX provider
+            on port 1338.
+          </p>
+        </article>
+        <article>
+          <h3>tpx-claude · your Claude login</h3>
+          <p>
+            Backed by your own Claude Code subscription, personal use only. Approving a grant
+            takes a PIN printed to your terminal, and each session is stripped down to plain
+            chat completions.
+          </p>
+        </article>
+      </div>
+      <pre class="quickstart"><code><span class="c"># serve your laptop as a TPX provider (Jan.ai on :1337)</span>
+$ cd apps/tpx-local && bun run start
+
+<span class="c"># make it reachable from hosted Pony Chat</span>
+$ cloudflared tunnel --url http://localhost:1338
+
+<span class="c"># then paste the https://*.trycloudflare.com URL into the</span>
+<span class="c"># connect box at ponychat.tokenpony.dev and approve a budget</span></code></pre>
     </section>
 
     <section id="compare" class="wrap compare">
@@ -661,6 +701,41 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     color: var(--muted);
   }
 
+  /* Hosted or local */
+  .local {
+    padding-block: clamp(3rem, 7vw, 5rem) 0;
+  }
+
+  .local h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: 2rem;
+  }
+
+  .local-grid article {
+    border-top: 2px solid var(--ink);
+    padding-top: 1rem;
+  }
+
+  .local-grid h3 {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
+    color: var(--red);
+  }
+
+  .local-grid p {
+    color: var(--muted);
+    font-size: 0.97rem;
+  }
+
   /* Comparison */
   .compare {
     padding-block: clamp(3rem, 7vw, 5rem) 0;
@@ -789,7 +864,8 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
 
     .why-grid,
     .claims,
-    .agent-grid {
+    .agent-grid,
+    .local-grid {
       grid-template-columns: minmax(0, 1fr);
     }
 
