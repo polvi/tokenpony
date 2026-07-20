@@ -163,10 +163,12 @@ const usedEl = document.getElementById('used');
 const history = [];
 let used = Number(usedEl.dataset.init) || 0;
 
+const DEFAULT_MODEL = 'llama-3.3-70b';
 fetch('/models').then(r => r.json()).then(body => {
   for (const m of body.data ?? []) {
     const opt = document.createElement('option');
     opt.value = m.id; opt.textContent = m.id;
+    if (m.id === DEFAULT_MODEL) opt.selected = true;
     modelSel.append(opt);
   }
 }).catch(() => {});
