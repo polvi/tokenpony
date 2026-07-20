@@ -27,8 +27,14 @@ bun run start            # listens on :1339, prints the approval PIN
 ```
 
 Env vars: `PORT` (default 1339), `PIN` (default random per start), `MODELS`
-(default `opus,sonnet,haiku`, comma-separated `--model` values), `CLAUDE_BIN`
+(default `fable,opus,sonnet,haiku`, comma-separated `--model` values), `CLAUDE_BIN`
 (default `claude`). Requires a logged-in Claude Code CLI on this machine.
+
+At boot the shim verifies each candidate model with a tiny completion: the CLI's init
+event resolves the alias to a full model id, and models this login cannot use fail fast
+at zero cost and are dropped from the catalog. Results are cached for a day in
+`models.json`; delete it to re-verify. `/models` therefore lists exactly what your
+subscription can serve, and chat requests accept either the full id or the alias.
 
 ## Use from hosted Pony Chat
 

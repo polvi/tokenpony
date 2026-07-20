@@ -17,7 +17,7 @@
  * counts. The grant budget is a cap, not a payment.
  */
 
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -30,9 +30,11 @@ import type { Context } from 'hono';
 
 const PORT = Number(process.env.PORT ?? 1339);
 const CLAUDE_BIN = process.env.CLAUDE_BIN ?? 'claude';
-const MODELS = (process.env.MODELS ?? 'opus,sonnet,haiku').split(',').map((m) => m.trim());
+const CANDIDATES = (process.env.MODELS ?? 'fable,opus,sonnet,haiku').split(',').map((m) => m.trim());
 const COMPLETION_TIMEOUT_MS = 300_000;
 const STATE_PATH = new URL('../state.json', import.meta.url).pathname;
+const MODELS_CACHE_PATH = new URL('../models.json', import.meta.url).pathname;
+const MODELS_CACHE_TTL_MS = 24 * 3600 * 1000;
 
 const PIN =
   process.env.PIN ?? String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
@@ -77,6 +79,7 @@ interface StreamEventLine {
   subtype?: string;
   is_error?: boolean;
   result?: string;
+  model?: string; // resolved full model id, on the init event
   event?: {
     type: string;
     delta?: { type: string; text?: string };
@@ -157,6 +160,68 @@ function usageOf(result: StreamEventLine) {
   };
 }
 
+// -- Model verification -------------------------------------------------------
+
+interface VerifiedModel {
+  alias: string; // the configured name, e.g. 'sonnet'
+  id: string; // the resolved full id from the init event, e.g. 'claude-sonnet-5'
+}
+
+/**
+ * Attempt a tiny completion to learn whether this login can use the model and
+ * what full id the alias resolves to. Unavailable models fail fast (the CLI
+ * reports is_error with zero cost); available ones spend a few dozen tokens.
+ */
+async function probeModel(alias: string): Promise<VerifiedModel | null> {
+  const proc = spawnClaude(alias, FRAMING, 'Reply with only: ok');
+  let id = alias;
+  for await (const event of claudeEvents(proc.stdout)) {
+    if (event.subtype === 'init' && event.model) id = event.model;
+    if (event.type === 'result') return event.is_error ? null : { alias, id };
+  }
+  return null;
+}
+
+async function verifyModels(): Promise<VerifiedModel[]> {
+  try {
+    const cache = JSON.parse(readFileSync(MODELS_CACHE_PATH, 'utf8')) as {
+      candidates: string[];
+      checked_at: number;
+      models: VerifiedModel[];
+    };
+    if (
+      cache.candidates.join(',') === CANDIDATES.join(',') &&
+      Date.now() - cache.checked_at < MODELS_CACHE_TTL_MS
+    )
+      return cache.models;
+  } catch {
+    // no cache yet
+  }
+  const models = (await Promise.all(CANDIDATES.map(probeModel))).filter(
+    (m): m is VerifiedModel => m !== null,
+  );
+  writeFileSync(
+    MODELS_CACHE_PATH,
+    JSON.stringify({ candidates: CANDIDATES, checked_at: Date.now(), models }, null, 2),
+  );
+  return models;
+}
+
+const verifiedModels = verifyModels().then((models) => {
+  if (models.length === 0)
+    console.log('no models verified; is the claude CLI logged in? (claude /login)');
+  else
+    console.log(
+      `verified models: ${models.map((m) => `${m.alias} -> ${m.id}`).join(', ')}` +
+        (models.length < CANDIDATES.length
+          ? ` (dropped: ${CANDIDATES.filter((c) => !models.some((m) => m.alias === c)).join(', ')})`
+          : ''),
+    );
+  resolvedModels = models;
+  return models;
+});
+let resolvedModels: VerifiedModel[] | null = null;
+
 // -- Inference handlers -------------------------------------------------------
 
 const ZERO_PRICING = {
@@ -167,10 +232,11 @@ const ZERO_PRICING = {
   source: 'subscription',
 };
 
-function listModels(c: Context) {
+async function listModels(c: Context) {
+  const models = await verifiedModels;
   return c.json({
     object: 'list',
-    data: MODELS.map((id) => ({ id, object: 'model', owned_by: 'anthropic', pricing: ZERO_PRICING })),
+    data: models.map((m) => ({ id: m.id, object: 'model', owned_by: 'anthropic', pricing: ZERO_PRICING })),
   });
 }
 
@@ -182,7 +248,8 @@ async function chatCompletions(c: Context, grant: Grant) {
     return apiError(c, 400, 'invalid_request', 'Body must be JSON');
   }
   const model = body.model ?? '';
-  if (!MODELS.includes(model))
+  const models = await verifiedModels;
+  if (!models.some((m) => m.id === model || m.alias === model))
     return apiError(c, 404, 'model_not_found', `Unknown model '${model}'; see /v1/models`);
   if (grant.models && !grant.models.includes(model))
     return apiError(c, 403, 'model_not_allowed', `Grant is limited to: ${grant.models.join(', ')}`);
@@ -294,11 +361,11 @@ const app = createTpxProvider({
 <code>claude -p</code>, subscription auth handled entirely by the CLI). Personal use only: grant
 approval requires the PIN printed in the terminal, and spawned sessions have no tools, no MCP
 servers, and an empty working directory.</p>
-<p>Models: ${MODELS.map((m) => `<code>${m}</code>`).join(', ')}. All completions report
-<code>credits_charged: 0</code>.</p>`,
+<p>Models: ${(resolvedModels ?? []).map((m) => `<code>${m.id}</code>`).join(', ') || 'verifying against this login, refresh shortly'}.
+All completions report <code>credits_charged: 0</code>.</p>`,
 });
 
-console.log(`tpx-claude listening on http://localhost:${PORT} (models: ${MODELS.join(', ')})`);
+console.log(`tpx-claude listening on http://localhost:${PORT}, verifying models: ${CANDIDATES.join(', ')}`);
 console.log(`grant approval PIN: ${PIN}`);
 
 export default {
