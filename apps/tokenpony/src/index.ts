@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { api } from './api';
 import { oauth, authorizationServerMetadata, protectedResourceMetadata } from './oauth';
 import { dashboard } from './dashboard';
+import { authPages } from './login';
 import { billing } from './billing';
 import { sweepExpired } from './sweeper';
 import { aauth, aauthResourceMetadata } from './aauth/routes';
@@ -51,6 +52,7 @@ app.route('/v1', api);
 app.route('/', api);
 app.route('/', oauth);
 app.route('/', aauth);
+app.route('/', authPages);
 app.route('/dashboard', dashboard);
 app.route('/billing', billing);
 

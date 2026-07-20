@@ -40,8 +40,10 @@ export async function ensureUser(c: Context<AppEnv>, userId: string): Promise<Se
 }
 
 export function loginRedirect(c: Context<AppEnv>): Response {
+  // Native sign-in screen (this worker's /login); AuthGravity is called from
+  // the browser there, so nobody leaves the app to authenticate.
   const returnTo = encodeURIComponent(c.req.url);
-  return c.redirect(`${c.env.AUTHGRAVITY_URL}/login?return_to=${returnTo}`);
+  return c.redirect(`/login?return_to=${returnTo}`);
 }
 
 /** Session-gated pages: resolves the user or redirects to hosted login. */

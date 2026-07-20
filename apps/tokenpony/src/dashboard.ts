@@ -160,7 +160,7 @@ ${
 <p class="muted">Registration is also open via <code>POST /register</code> (RFC 7591); see the <a href="https://tokenpony.dev/spec">spec</a>.</p>
 
 <h2>Session</h2>
-<form method="post" action="${esc(c.env.AUTHGRAVITY_URL)}/v1/logout"><button class="quiet">Log out</button></form>`,
+<form method="get" action="/logout"><button class="quiet">Log out</button></form>`,
     ),
   );
 });
