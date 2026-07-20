@@ -1,4 +1,4 @@
-# tokenpony / Token Pony Express (TPX) v0.2
+# tokenpony / Token Pony Express (TPX) v0.3
 
 tokenpony is the home of TPX and its reference provider. TPX is an OAuth 2.0 profile
 (OAuth 2.1 baseline) for metered LLM inference grants: an application ships with NO LLM
@@ -6,7 +6,8 @@ credentials of its own, and the user grants it a metered credit budget from a pr
 user chooses and pays. Grants are budget-capped, revocable, and pseudonymous (they carry
 no user identity). A conforming OAuth client stack works without modification; everything
 TPX-specific is one authorization details type (llm-inference), one introspection member
-(budget_used), and one usage member (credits_charged).
+(budget_used), one usage member (cost), and one account endpoint (GET /credits). All money
+on the wire is USD.
 
 - Resource (inference API): https://api.tokenpony.dev
 - Discovery entry point: GET https://api.tokenpony.dev/.well-known/oauth-protected-resource
@@ -16,11 +17,12 @@ TPX-specific is one authorization details type (llm-inference), one introspectio
 
 ## Units
 
-All balances and budgets are CREDITS: 1 credit = US$0.000001, so "$X per M tokens" is
-exactly X credits per token. Users buy credits at the dashboard via Stripe at face value
-($1 = 1,000,000 credits); checkout adds card fees at cost, and after a user's first
-top-off each purchase also adds postage: the price of one US Forever stamp (currently
-$0.82). There are no free credits. Per-model rates in credits are on GET {resource}/models.
+All money on the wire is USD: budgets and budget_used are JSON numbers (a budget of 0.10
+caps spend at ten cents), per-request cost is a USD number, and per-token prices are USD
+decimal strings. Users top off their balance at the dashboard via Stripe at face value;
+checkout adds card fees at cost, and after a user's first top-off each purchase also adds
+postage: the price of one US Forever stamp (currently $0.82). There are no free credits.
+Per-model USD rates are on GET {resource}/models.
 
 ## Integrating an app (standard OAuth 2.1)
 
@@ -58,13 +60,14 @@ Step 2. Authorize. PKCE S256 is REQUIRED. Push the request via PAR, then redirec
     &redirect_uri=https://myapp.example/callback
     &code_challenge={S256(verifier)}&code_challenge_method=S256
     &resource=https://api.tokenpony.dev
-    &authorization_details=[{"type":"llm-inference","budget":100000}]
+    &authorization_details=[{"type":"llm-inference","budget":0.10}]
     &state={optional}
     -> 201 { "request_uri": "urn:ietf:params:oauth:request_uri:...", "expires_in": 90 }
 
     Redirect the user to: {authorization_endpoint}?client_id=app_...&request_uri=...
 
-The budget is credits (100000 = $0.10 cap). Optional "models": ["kimi-k2.7-code", ...]
+The budget is USD, at most 6 decimal places (0.10 = ten-cent cap). Optional
+"models": ["kimi-k2.7-code", ...]
 restricts the grant to listed models. Unknown fields are rejected (fail closed).
 
 The user authenticates with a passkey and approves. Callback:
@@ -82,7 +85,7 @@ Step 3. Exchange the code (form-encoded, RFC 6749):
     &client_id=app_...&code_verifier={verifier}
     -> { "access_token": "tpx_at_...", "token_type": "Bearer", "expires_in": 3600,
          "refresh_token": "tpx_rt_...",
-         "authorization_details": [{"type":"llm-inference","budget":100000}] }
+         "authorization_details": [{"type":"llm-inference","budget":0.1}] }
 
 Read the granted budget from authorization_details (it may be lower than requested).
 Access tokens live 1 hour. Refresh with grant_type=refresh_token; refresh tokens ROTATE
@@ -90,11 +93,16 @@ on every use, and reusing a rotated one revokes the grant. DPoP (ES256) is suppo
 /token and the API; send a DPoP proof to sender-constrain your tokens (recommended).
 OAuth endpoints return flat RFC 6749 errors: {"error": "...", "error_description": "..."}.
 
-Step 4. Chat on the user's credits. The API is OpenAI-compatible, served both at
+Step 4. Chat on the user's balance. The API is OpenAI-compatible, served both at
 {resource}/chat/completions and {resource}/v1/chat/completions (for OpenAI SDKs, set
 baseURL={resource}/v1 and apiKey={access_token}).
 
-    GET  {resource}/models          (no auth; includes credits_per_token rates)
+    GET  {resource}/models          (no auth; OpenRouter-shaped pricing: USD per token
+                                     as strings: prompt, completion, request,
+                                     input_cache_read; "0" means free)
+    GET  {resource}/credits         (Bearer; spend summary for this credential, in USD:
+                                     { "data": { "total_purchased", "total_used" } };
+                                     grant tokens see only their grant)
     POST {resource}/chat/completions
     Authorization: Bearer tpx_at_...
     { "model": "llama-3.3-70b", "messages": [{"role":"user","content":"hi"}],
@@ -104,14 +112,14 @@ Every response carries the exact charge; streaming reports it in the final SSE c
 
     "usage": { "prompt_tokens": 812, "cached_tokens": 256,
                "completion_tokens": 214, "total_tokens": 1026,
-               "credits_charged": 1930 }
+               "cost": 0.00193 }
 
 ## Grant state
 
     POST {introspection_endpoint}   token=tpx_at_...
     -> { "active": true, "client_id": "app_...", "exp": ...,
-         "authorization_details": [{"type":"llm-inference","budget":100000}],
-         "budget_used": 41250 }
+         "authorization_details": [{"type":"llm-inference","budget":0.1}],
+         "budget_used": 0.04125 }
 
 Remaining budget = budget - budget_used. No identity claims are ever returned.
 
@@ -162,9 +170,8 @@ Flow (agent side):
    and returns { auth_token, token_type:"AAuth", expires_in, funded, funding_url? }.
 3. The agent calls {resource}/chat/completions with `Authorization: AAuth <auth_token>` plus an
    RFC 9421 signature over `@method @authority @path signature-key authorization` (Authorization
-   MUST be covered). Send max_completion_tokens (reservation bound). Usage reports credits_charged.
-   Budget is credits (amount USD x 1_000_000); 1 credit = US$0.000001.
-4. GET {resource}/grant (signed) -> { active, budget, spent, credits, credits_used }.
+   MUST be covered). Send max_completion_tokens (reservation bound). Usage reports cost (USD).
+4. GET {resource}/grant (signed) -> { active, budget, spent } (USD amount strings).
 
 Errors: 401 invalid_token / mission_revoked|completed|expired; 402 budget_exhausted |
 balance_exhausted | mission_unfunded (+funding_url); 403 model_not_allowed; 400 max_tokens_required.

@@ -1,6 +1,6 @@
 -------------------------------- MODULE tpx_a --------------------------------
 (*
-TPX-A mission lifecycle and budget metering (SPEC.md Appendix B; implemented
+TPX-A mission lifecycle and budget metering (SPEC.md Appendix C; implemented
 in apps/tokenpony/src/aauth/, wire shapes per the aauth-seams contract).
 
 Models the safety core of the agent flow:
@@ -29,7 +29,7 @@ CONSTANTS
   Atts,       \* budget_attestation jtis a Person Server may issue
   Reqs,       \* concurrent inference request slots
   NoMission,  \* model value: "not tied to any mission"
-  MaxBudget,  \* largest budget a PS attestation can carry, in credits
+  MaxBudget,  \* largest budget a PS attestation can carry, integer micro-USD
   Costs       \* possible worst-case reservation amounts for one completion
 
 ASSUME NoMission \notin Missions
@@ -45,7 +45,7 @@ VARIABLES
   funded,     \* mission -> a user has claimed the ref (user_id set)
   reqPhase,   \* req     -> "idle" | "inflight"
   reqMission, \* req     -> mission being spent against, or NoMission
-  reqAmt      \* req     -> credits reserved for this request
+  reqAmt      \* req     -> integer micro-USD reserved for this request
 
 vars == <<attPhase, attMission, attBudget, mStatus, mBudget, mUsed,
           mReserved, funded, reqPhase, reqMission, reqAmt>>
@@ -177,7 +177,7 @@ Spec == Init /\ [][Next]_vars
 BudgetIsHardCap == \A m \in Missions : mUsed[m] + mReserved[m] <= mBudget[m]
 
 (* No money moves on an unfunded mission: an unclaimed ref has never had a
-   credit reserved or charged (mission_unfunded gate). *)
+   micro-USD reserved or charged (mission_unfunded gate). *)
 SpendRequiresFunding ==
   \A m \in Missions : mUsed[m] + mReserved[m] > 0 => funded[m]
 

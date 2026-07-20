@@ -1,13 +1,13 @@
 ---
 layout: ../layouts/Prose.astro
-title: "TPX v0.2: the Token Pony Express specification"
-description: "TPX v0.2: an OAuth 2.0 profile for metered LLM inference grants, plus TPX-A, the experimental AAuth-Budget profile for autonomous agents."
+title: "TPX v0.3: the Token Pony Express specification"
+description: "TPX v0.3: an OAuth 2.0 profile for metered LLM inference grants with USD pricing and metering, plus TPX-A, the experimental AAuth-Budget profile for autonomous agents."
 ---
-# TPX v0.2 Specification
+# TPX v0.3 Specification
 
 **An OAuth 2.0 profile for metered LLM inference grants**
 
-Status: Draft. Supersedes TPX v0.1. Reference implementation: [tokenpony.dev](https://tokenpony.dev).
+Status: Draft. Supersedes TPX v0.2. Reference implementation: [tokenpony.dev](https://tokenpony.dev).
 
 ## Acknowledgments
 
@@ -19,11 +19,14 @@ TPX lets an LLM application operate without embedded provider
 credentials: the user grants the app a metered token budget from a
 provider the user chooses and pays.
 
-TPX v0.1 defined a bespoke OAuth-style flow. v0.2 removes the bespoke
-wire format: TPX is now a profile of OAuth 2.0, aligned with the OAuth
+TPX v0.1 defined a bespoke OAuth-style flow. v0.2 removed the bespoke
+wire format: TPX is a profile of OAuth 2.0, aligned with the OAuth
 2.1 baseline. A TPX provider is an ordinary OAuth authorization server
 plus a protected resource. A TPX app is an ordinary OAuth client.
-Everything TPX-specific is carried by one authorization details type (`llm-inference`), one introspection member (`budget_used`), and one usage-accounting member on the inference API (`credits_charged`). A conforming OAuth client stack works against a TPX provider without modification.
+v0.3 aligns the money surface with prevailing API convention: all money
+on the wire is USD, model pricing follows the OpenRouter schema, and a
+`/credits` endpoint reports spend.
+Everything TPX-specific is carried by one authorization details type (`llm-inference`), one introspection member (`budget_used`), one usage-accounting member on the inference API (`cost`), and one account endpoint (`GET /credits`). A conforming OAuth client stack works against a TPX provider without modification.
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHOULD", "SHOULD NOT",
 "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
@@ -62,8 +65,12 @@ interpreted as described in RFC 2119 and RFC 8174.
   authorization server and the protected resource (an OpenAI-compatible
   inference API). The two roles MAY be served from different origins.
 - **Grant**: a user's approval of one app for one budget. Represented at runtime by a refresh token and the access tokens issued from it.
-- **Budget**: the maximum spend authorized under a grant, denominated in credits. A damage cap, not a payment.
-- **Credit**: 1 credit = US$0.000001. A `budget` of `100000` caps spend at $0.10.
+- **Budget**: the maximum spend authorized under a grant, denominated in USD. A damage cap, not a payment. A `budget` of `0.10` caps spend at ten cents.
+
+All money on the wire is USD: budgets and `budget_used` are JSON
+numbers, per-token prices are decimal strings. Providers keep whatever
+internal integer ledger they like (integer micro-USD is RECOMMENDED, as
+in the reference implementation) and convert at the API edge.
 
 ## 3. Protocol Overview
 
@@ -85,7 +92,7 @@ User          App                 Provider (AS)              Provider (API)
  |             |<--- access_token (short-lived), refresh_token,   |
  |             |     granted authorization_details --|            |
  |             |-- POST /chat/completions (DPoP-bound token) ---->|
- |             |<--- completion + usage.credits_charged ----------|
+ |             |<--- completion + usage.cost ---------------------|
 ```
 
 ## 4. Discovery
@@ -141,11 +148,11 @@ Each listed authorization server MUST publish RFC 8414 metadata at `/.well-known
 
 ### 4.3 Models and rates
 
-Model discovery is part of the inference API surface, not OAuth metadata: `GET {resource}/models` lists available models, and each entry carries its per-token rates in credits (fresh input, cached input, output).
+Model discovery is part of the inference API surface, not OAuth metadata: `GET {resource}/models` lists available models, and each entry carries a `pricing` object of USD-per-token decimal strings, aligned with the OpenRouter model schema: `prompt`, `completion`, `request`, and `input_cache_read`, where `"0"` means free. `source` is an OPTIONAL provenance extension (for example `cloudflare_catalog`, `local`, `subscription`). See Section 8.2 for an example entry.
 
 ## 5. Client Registration
 
-Apps register via RFC 7591 dynamic registration. Registration is open in v0.2; providers MAY gate access.
+Apps register via RFC 7591 dynamic registration. Registration is open; providers MAY gate access.
 
 ```
 POST https://api.tokenpony.dev/register
@@ -178,7 +185,7 @@ authorization details object rather than a bespoke query parameter:
 ```json
 {
   "type": "llm-inference",
-  "budget": 100000,
+  "budget": 0.10,
   "models": ["pony-8b", "pony-70b"]
 }
 ```
@@ -186,8 +193,11 @@ authorization details object rather than a bespoke query parameter:
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `type` | REQUIRED | The string `llm-inference`. |
-| `budget` | REQUIRED | Positive integer. Maximum spend under this grant, in credits. |
+| `budget` | REQUIRED | Positive USD number, at most 6 decimal places. Maximum spend under this grant. |
 | `models` | OPTIONAL | Array of model identifiers the grant is limited to. Absent means all models. |
+
+JSON numbers do not preserve trailing zeros: a requested `0.10` echoes
+back as `0.1`. These are the same value.
 
 Providers MUST reject a request whose `llm-inference`
 object contains unrecognized fields or malformed values (fail closed,
@@ -212,7 +222,7 @@ response_type=code
 &code_challenge_method=S256
 &state=af0ifjsldkj
 &resource=https%3A%2F%2Fapi.tokenpony.dev
-&authorization_details=%5B%7B%22type%22%3A%22llm-inference%22%2C%22budget%22%3A100000%7D%5D
+&authorization_details=%5B%7B%22type%22%3A%22llm-inference%22%2C%22budget%22%3A0.10%7D%5D
 ```
 
 The client then redirects the user to `{authorization_endpoint}?client_id=app_7f3k&request_uri={request_uri}`.
@@ -230,9 +240,8 @@ Requirements:
 The provider authenticates the user by its own means (tokenpony.dev
 uses passkeys via AuthGravity) and renders consent showing, at minimum:
 the client identity (registered name and, when available, verified
-origin), the requested budget in credits and its currency equivalent,
-and any model restriction. The user or provider MAY grant a lower budget
-than requested.
+origin), the requested budget in dollars, and any model restriction.
+The user or provider MAY grant a lower budget than requested.
 
 ### 6.4 Authorization response
 
@@ -283,7 +292,7 @@ Token endpoint errors use the flat RFC 6749 Section 5.2 shape (`{"error": "...",
   "expires_in": 3600,
   "refresh_token": "tpx_rt_tGzv3JOkF0XG5Qx2TlKWIA",
   "authorization_details": [
-    { "type": "llm-inference", "budget": 100000 }
+    { "type": "llm-inference", "budget": 0.1 }
   ]
 }
 ```
@@ -328,25 +337,54 @@ DPoP: eyJ0eXAiOiJkcG9wK2p3dCIs...
 
 Providers MUST serve, relative to the resource identifier:
 
-- `GET /models`: available models with per-token rates in credits.
+- `GET /models`: available models with OpenRouter-shaped USD-per-token pricing (Section 4.3):
+
+```json
+{
+  "id": "pony-70b",
+  "object": "model",
+  "pricing": {
+    "prompt": "0.000000293",
+    "completion": "0.000002253",
+    "request": "0",
+    "input_cache_read": "0.000000293",
+    "source": "cloudflare_catalog"
+  }
+}
+```
+
 - `POST /chat/completions`: OpenAI-compatible, streaming (SSE) and non-streaming.
+- `GET /credits`: bearer-authenticated spend summary for the presented
+  credential, in USD. A grant token sees only its own grant: the granted
+  budget as `total_purchased` and the grant's spend as `total_used`,
+  never account-wide totals (Section 11). A provider MAY give its own
+  first-party credentials an account-wide view. The endpoint MUST answer
+  `200` even when the budget or balance is exhausted.
+
+```json
+{ "data": { "total_purchased": 0.1, "total_used": 0.04125 } }
+```
 
 ### 8.3 Metering
 
 The provider prices actual usage (fresh input, cached input, and
-output tokens at the model's published rates) and debits the grant in
-credits. Responses report the debit in the `usage` object:
+output tokens at the model's published rates) and debits the grant.
+Responses report the debit in USD as `cost` in the `usage` object:
 
 ```json
 "usage": {
   "prompt_tokens": 812,
   "cached_tokens": 256,
   "completion_tokens": 214,
-  "credits_charged": 1930
+  "cost": 0.00193
 }
 ```
 
-Streaming responses report `usage`, including `credits_charged`, in the final SSE chunk.
+Free providers (local inference, subscription-backed shims) report
+`cost: 0`. Providers MAY add `cost_details.upstream_inference_cost`
+alongside `cost`, as in the OpenRouter usage schema.
+
+Streaming responses report `usage`, including `cost`, in the final SSE chunk.
 
 ### 8.4 Errors
 
@@ -376,13 +414,13 @@ budget before starting large jobs:
   "token_type": "DPoP",
   "exp": 1784563200,
   "authorization_details": [
-    { "type": "llm-inference", "budget": 100000 }
+    { "type": "llm-inference", "budget": 0.1 }
   ],
-  "budget_used": 41250
+  "budget_used": 0.04125
 }
 ```
 
-- `budget_used` is a TPX extension member: total credits debited against the grant. Remaining budget is `budget - budget_used`.
+- `budget_used` is a TPX extension member: total USD debited against the grant. Remaining budget is `budget - budget_used`.
 - Responses MUST NOT include `sub` or any other identity claim.
 
 ### 9.2 Revocation
@@ -399,7 +437,7 @@ When a grant runs dry the app starts a new authorization request with a fresh `l
 ## 10. Security Considerations
 
 - **Budget as damage cap.** A leaked access or refresh
-  token can spend at most the remaining budget. v0.2 layers standard
+  token can spend at most the remaining budget. TPX layers standard
   defenses in front of the cap: short-lived access tokens, rotating
   refresh tokens with reuse detection, and DPoP sender constraining.
 - **Mix-up attacks.** TPX clients talk to arbitrary
@@ -423,11 +461,26 @@ is inherent to metering.
 
 ## 12. Conformance
 
-A **provider** MUST implement: RFC 8414 and RFC 9728 metadata; RFC 7591 registration; PKCE `S256`; PAR; RFC 9207 `iss`; the `llm-inference` authorization details type; short-lived audience-restricted access tokens with `expires_in`; rotating refresh tokens with reuse detection; DPoP support; introspection with `budget_used`; RFC 7009 revocation; the Section 8 API surface and error signals.
+A **provider** MUST implement: RFC 8414 and RFC 9728 metadata; RFC 7591 registration; PKCE `S256`; PAR; RFC 9207 `iss`; the `llm-inference` authorization details type; short-lived audience-restricted access tokens with `expires_in`; rotating refresh tokens with reuse detection; DPoP support; introspection with `budget_used`; RFC 7009 revocation; the Section 8 API surface (including `GET /credits`) and error signals.
 
 An **app** MUST: use PKCE; validate `iss`; register exact redirect URIs; request and read budgets via `authorization_details`; handle `401 invalid_token` by refreshing and `invalid_grant` by re-authorizing. It SHOULD: use PAR and DPoP; introspect before large jobs; revoke grants it no longer needs.
 
-## Appendix A. Changes from v0.1
+## Appendix A. Changes from v0.2
+
+v0.3 changes only the money surface, aligning it with prevailing API
+convention (the OpenRouter schema where one exists). The OAuth profile
+is unchanged.
+
+| v0.2 | v0.3 |
+| --- | --- |
+| `budget` as a positive integer in credits (`100000`) | `budget` as a USD number (`0.10`) |
+| `usage.credits_charged` (integer credits) | `usage.cost` (USD number); optional `cost_details` |
+| `budget_used` in credits via introspection | `budget_used` in USD via introspection |
+| `/models` pricing: `usd_per_m_*` numbers + `credits_per_token` strings | OpenRouter-shaped `pricing`: USD-per-token decimal strings (`prompt`, `completion`, `request`, `input_cache_read`), `"0"` = free, optional `source` |
+| No spend summary endpoint | `GET /credits`: `{ "data": { "total_purchased", "total_used" } }` in USD, grant-scoped for apps |
+| Credits (micro-USD) as a protocol concept | USD on the wire; integer ledgers are a provider-internal choice |
+
+## Appendix B. Changes from v0.1
 
 | v0.1 | v0.2 |
 | --- | --- |
@@ -445,12 +498,12 @@ An **app** MUST: use PKCE; validate `iss`; register exact redirect URIs; request
 | Nested error body at OAuth endpoints | Flat RFC 6749 errors at OAuth endpoints; nested body kept at the inference API |
 | Dashboard-only revocation | Dashboard + RFC 7009 for apps |
 
-## Appendix B. TPX-A: the AAuth-Budget profile (for agents, experimental)
+## Appendix C. TPX-A: the AAuth-Budget profile (for agents, experimental)
 
 Status: Experimental. The OAuth profile in the body of this specification is the stable
 core of TPX; TPX-A tracks the evolving AAuth drafts and will change as they do.
 
-TPX v0.2 authorizes apps acting for a signed-in person. For autonomous **agents** that carry
+TPX authorizes apps acting for a signed-in person. For autonomous **agents** that carry
 their own cryptographic identity, tokenpony also implements **TPX-A**, the Token Pony Express
 binding of the AAuth-Budget extension (draft-mcguinness-aauth-budget) on top of AAuth
 (draft-hardt-oauth-aauth-protocol). It runs alongside this OAuth flow on the same metering
@@ -460,8 +513,8 @@ Under TPX-A the provider is an AAuth resource plus access server. An agent (Ed25
 RFC 9421 HTTP Message Signatures) is granted an identity-free, budget-bearing `aa-auth+jwt`
 that a person approves as a budgeted **mission** at their Person Server; the PS relays the
 approved budget to the provider's `/token`, which mints the token, and the agent spends it at
-the same OpenAI-compatible inference API. Budgets are the same credits as here (1 credit =
-US$0.000001), metered mission-keyed with reservation, and revocable. Discovery is
+the same OpenAI-compatible inference API. Budgets are USD amounts (carried as
+`{ "amount", "currency" }` entries), metered mission-keyed with reservation, and revocable. Discovery is
 `/.well-known/aauth-resource.json` (with `budget_endpoint`), distinct from the OAuth metadata
 above. See the agent guide at [tokenpony.dev/llms.txt](https://tokenpony.dev/llms.txt).
 

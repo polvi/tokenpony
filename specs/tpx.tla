@@ -1,6 +1,10 @@
 --------------------------------- MODULE tpx ---------------------------------
 (*
-TPX v0.2 grant lifecycle and budget metering (SPEC.md).
+TPX v0.3 grant lifecycle and budget metering (SPEC.md v0.3).
+
+v0.3 changed only the wire money surface (USD numbers instead of integer
+micro-USD "credits"); providers still meter in integer micro-USD, so this
+model's integer semantics are unchanged.
 
 Models the safety core of the profile:
   - authorization codes are single-use; replay revokes the minted grant (S6.4)
@@ -19,8 +23,9 @@ CONSTANTS
   Codes,       \* authorization code ids
   Grants,      \* grant ids
   NoGrant,     \* model value: "no grant minted from this code"
-  MaxBudget,   \* largest budget a consent screen can approve, in credits
-  Costs,       \* possible credits_charged values for one completion
+  MaxBudget,   \* largest budget a consent screen can approve, integer micro-USD
+  Costs,       \* possible usage.cost values for one completion
+               \* (wire USD; modeled as integer micro-USD)
   MaxRefresh   \* bound on refresh-token rotations per grant (finiteness)
 
 ASSUME NoGrant \notin Grants
@@ -31,7 +36,8 @@ VARIABLES
   codeGrant,   \* code  -> grant minted from it, or NoGrant
   grantPhase,  \* grant -> "unminted" | "active" | "revoked"
   budget,      \* grant -> granted budget (from authorization_details)
-  used,        \* grant -> total credits debited (introspection budget_used)
+  used,        \* grant -> total integer micro-USD debited
+               \* (introspection budget_used, reported in USD on the wire)
   rt           \* grant -> current refresh-token generation
 
 vars == <<codePhase, codeBudget, codeGrant, grantPhase, budget, used, rt>>
@@ -104,8 +110,9 @@ RefreshReuse(g) ==
   /\ grantPhase' = [grantPhase EXCEPT ![g] = "revoked"]
   /\ UNCHANGED <<codePhase, codeBudget, codeGrant, budget, used, rt>>
 
-(* A metered completion debits credits_charged against the grant; the provider
-   refuses spend past the budget with 402 budget_exhausted (S8.3, S8.4). *)
+(* A metered completion debits usage.cost (wire USD; modeled as integer
+   micro-USD) against the grant; the provider refuses spend past the budget
+   with 402 budget_exhausted (S8.3, S8.4). *)
 Spend(g, k) ==
   /\ grantPhase[g] = "active"
   /\ used[g] + k <= budget[g]
