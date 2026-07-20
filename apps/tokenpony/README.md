@@ -1,6 +1,6 @@
 # tokenpony-api
 
-The tokenpony provider Worker at **api.tokenpony.dev**: TPX v0.2 issuer (discovery, client
+The tokenpony provider Worker at **api.tokenpony.dev**: TPX v0.3 issuer (discovery, client
 registration, consent, token exchange), OpenAI-compatible metered inference over Workers AI,
 user dashboard, and Stripe billing. See the repo root `SPEC.md` for the protocol.
 
@@ -48,12 +48,13 @@ bunx wrangler deploy # from this directory
 
 ## Metering
 
-Balances, grant budgets, and pack sizes are denominated in **credits**: 1 credit =
-US$0.000001, so a model's "$X per M tokens" rate is exactly X credits per token. Each
+Money on the wire is USD (TPX v0.3): budgets and `usage.cost` are USD numbers, and
+`/models` publishes OpenRouter-shaped USD-per-token pricing strings. The D1 ledger stays
+integer micro-USD (1 credit = US$0.000001), converted at the API edge. Each
 completion is priced from actual usage (fresh input, cached input, and output tokens) at
 per-model rates pulled live from the Workers AI catalog via `env.AI.models()` (cached 6h per
 isolate, `src/pricing.ts`), with static fallbacks for models the catalog doesn't report.
-`usage.credits_charged` is returned on every completion and recorded in `usage_events`.
+`usage.cost` is returned on every completion; the debit is recorded in `usage_events`.
 
 `moonshotai/kimi-k3` ($3.00/M input, $0.30/M cached input, $15.00/M output) is plumbed
 (partner models route through the AI Gateway named by the `AI_GATEWAY_ID` var, currently

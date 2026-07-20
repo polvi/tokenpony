@@ -1,6 +1,6 @@
 # tpx-claude
 
-A TPX v0.2 provider shim backed by your own Claude Code login. Point Pony Chat, or any
+A TPX v0.3 provider shim backed by your own Claude Code login. Point Pony Chat, or any
 TPX client you run for yourself, at it and chat with Claude on your subscription.
 
 **Personal use only.** Each completion spawns headless Claude Code (`claude -p`) on this
@@ -16,8 +16,8 @@ reads, stores, or forwards credentials, and it is built to keep access yours alo
   subscription access with third parties is against Anthropic's terms; automating your
   own login for yourself with headless Claude Code is what the CLI's print mode is for.
 
-Subscription usage has no marginal price, so models publish zero credit rates and
-completions report `usage.credits_charged: 0` with real token counts.
+Subscription usage has no marginal price, so models publish zero USD rates and
+completions report `usage.cost: 0` with real token counts.
 
 ## Run
 

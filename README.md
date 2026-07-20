@@ -5,7 +5,7 @@ protocol where LLM apps ship with no API keys and users pay a token provider the
 and the **reference provider** that implements it end to end. It is a proof of concept.
 
 OAuth taught apps to ask for identity; TPX teaches them to ask for tokens. An app requests
-a metered credit budget, the user approves it with a passkey, and the provider debits
+a metered spending budget, the user approves it with a passkey, and the provider debits
 actual usage against that grant. Grants are budget-capped, revocable, and pseudonymous.
 
 ## Live
@@ -22,7 +22,7 @@ Agents integrate from `GET /.well-known/oauth-protected-resource` → its `docum
 ## Repo layout
 
 ```
-SPEC.md            TPX v0.2 protocol spec (source of truth; mirrored at /spec)
+SPEC.md            TPX v0.3 protocol spec (source of truth; mirrored at /spec)
 packages/tpx/      @tokenpony/tpx client SDK (types, discover, authorize, exchange, chat)
 packages/tpx-provider/  shared TPX provider surface for the local shims
 apps/www/          Astro marketing site -> tokenpony.dev
@@ -34,9 +34,10 @@ apps/tpx-claude/   personal TPX provider shim for your own Claude Code login
 
 ## How money works
 
-Balances and budgets are **credits**: 1 credit = US$0.000001, so a model's "$X per M
-tokens" rate is exactly X credits per token. Per-model prices are pulled live from the
-Workers AI catalog and every completion returns a `usage.credits_charged` extension.
+All money on the wire is **USD** (v0.3): budgets are USD numbers and every completion
+returns a `usage.cost` extension. Internally the ledger is integer micro-USD (1 credit =
+US$0.000001). Per-model prices are pulled live from the Workers AI catalog and published
+as OpenRouter-shaped USD-per-token strings on `/models`.
 Credits sell at face value; checkout passes Stripe fees through at cost, the first top-off
 is charged exactly at cost, and each later top-off nets one US Forever stamp of margin
 ("postage"). Details in [apps/tokenpony/README.md](apps/tokenpony/README.md).

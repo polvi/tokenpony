@@ -29,19 +29,19 @@ const steps = [
   {
     n: '04',
     name: 'Deliver',
-    body: 'The app calls the provider’s OpenAI-compatible API. The provider meters actual usage in credits against the budget; usage.credits_charged reports every debit. When it’s spent, the app asks again.',
+    body: 'The app calls the provider’s OpenAI-compatible API. The provider meters actual usage in dollars against the budget; usage.cost reports every debit. When it’s spent, the app asks again.',
   },
 ];
 ---
 
 <Layout
   title="tokenpony: bring your own tokens to any LLM app"
-  description="tokenpony is the home of TPX, an OAuth 2.0 profile for metered LLM inference grants where apps ship without API keys and users bring their own credit budget, and the reference provider that implements it."
+  description="tokenpony is the home of TPX, an OAuth 2.0 profile for metered LLM inference grants where apps ship without API keys and users bring their own spending budget, and the reference provider that implements it."
 >
   <main>
     <section class="hero wrap">
       <div class="hero-copy">
-        <p class="eyebrow">TPX v0.2 · an OAuth 2.0 profile + reference provider · proof of concept</p>
+        <p class="eyebrow">TPX v0.3 · an OAuth 2.0 profile + reference provider · proof of concept</p>
         <h1>Bring your own tokens to any LLM app.</h1>
         <p class="lede">
           tokenpony is the home of <strong>TPX</strong>, an OAuth 2.0 profile where apps ship without
@@ -148,7 +148,7 @@ $ curl https://api.tokenpony.dev\
           they carry their own cryptographic identity. So tokenpony also speaks <strong>TPX-A</strong>,
           our binding of <a href="https://aauth.dev">AAuth</a> (Dick Hardt's agent-authorization
           protocol) and its AAuth-Budget extension. An agent gets a metered, identity-free budget
-          that a person approves at a Person Server they choose. Same credits, same models, same
+          that a person approves at a Person Server they choose. Same dollars, same models, same
           meter as the rest of tokenpony. TPX-A is experimental: TPX is the focus for now, and
           this profile will change as the AAuth drafts evolve.
         </p>
@@ -167,7 +167,7 @@ $ curl https://api.tokenpony.dev\
             <h3>A person approves a budget</h3>
             <p>
               The person grants a budgeted <em>mission</em> at their Person Server, capped in
-              credits and limited to chosen models. tokenpony issues a token that carries the
+              dollars and limited to chosen models. tokenpony issues a token that carries the
               budget and <strong>no identity</strong>. <a href="https://authgravity.tokenpony.dev">AuthGravity</a> is the
               reference Person Server.
             </p>
@@ -244,7 +244,7 @@ $ curl https://api.tokenpony.dev\
               <th>Who pays for inference</th>
               <td>The app developer</td>
               <td>The user’s subscription</td>
-              <td>The user’s credit balance</td>
+              <td>The user’s OpenRouter balance</td>
               <td>The user</td>
               <td class="tpx-col">The user’s provider balance</td>
             </tr>
@@ -309,9 +309,9 @@ $ curl https://api.tokenpony.dev\
         <article>
           <h3>Deliberately borrowed</h3>
           <p>
-            The API surface is OpenAI’s, on purpose: your SDK already works. The authorization layer IS OAuth, on purpose: v0.2 is a profile, so standard
+            The API surface is OpenAI’s, on purpose: your SDK already works. The authorization layer IS OAuth, on purpose: TPX is a profile, so standard
             client libraries work unmodified. And
-            user-funded apps are proven ground: OpenRouter charges connected apps to your credit
+            user-funded apps are proven ground: OpenRouter charges connected apps to your
             balance, and the vendor sign-ins charge approved apps to your subscription. TPX is
             those ideas with the walls removed.
           </p>
@@ -334,9 +334,9 @@ $ curl -X POST https://api.tokenpony.dev/register \
 <span class="c"># push the authorization request (PAR + PKCE + a typed budget), then redirect</span>
 $ curl -X POST https://api.tokenpony.dev/par \
     -d 'response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256' \
-    -d 'authorization_details=[&#123;"type":"llm-inference","budget":100000&#125;]'
+    -d 'authorization_details=[&#123;"type":"llm-inference","budget":0.10&#125;]'
 
-<span class="c"># exchange the code for tokens, then chat on the user’s credits</span>
+<span class="c"># exchange the code for tokens, then chat on the user’s balance</span>
 $ curl https://api.tokenpony.dev/v1/chat/completions \
     -H "Authorization: Bearer tpx_at_…" \
     -d '&#123;"model":"llama-3.3-70b","messages":[&#123;"role":"user","content":"hi"&#125;]&#125;'</code></pre>

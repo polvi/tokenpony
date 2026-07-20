@@ -1,9 +1,9 @@
 # tpx-local
 
-A TPX v0.2 provider shim that fronts a local OpenAI-compatible server (built for
+A TPX v0.3 provider shim that fronts a local OpenAI-compatible server (built for
 [Jan.ai](https://jan.ai) on `localhost:1337`). Point Pony Chat, or any TPX client, at it
 and chat against your own machine. Local inference is free, so every model publishes zero
-credit rates and completions report `usage.credits_charged: 0`; the grant budget is a real
+USD rates and completions report `usage.cost: 0`; the grant budget is a real
 cap that never depletes.
 
 This is a Bun server, not a Worker. State (client registrations, grants) persists to
@@ -40,6 +40,7 @@ The provider surface a TPX client exercises: RFC 9728 + RFC 8414 discovery, RFC 
 dynamic registration, PAR + PKCE (S256) + the `llm-inference` RAR type (fail-closed
 validation), a consent page, authorization codes (single-use, 5 minutes, `iss` on the
 redirect), token issuance with rotating refresh tokens and reuse-detection revocation,
-RFC 7662 introspection with `budget_used`, RFC 7009 revocation, and `GET /models` plus
-streaming `POST /chat/completions` (also under `/v1`) with RFC 6750 challenges. DPoP is
+RFC 7662 introspection with `budget_used`, RFC 7009 revocation, and `GET /models`,
+`GET /credits`, plus streaming `POST /chat/completions` (all also under `/v1`) with
+RFC 6750 challenges. DPoP is
 not implemented; clients fall back to Bearer.
