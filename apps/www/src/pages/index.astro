@@ -41,14 +41,13 @@ const steps = [
   <main>
     <section class="hero wrap">
       <div class="hero-copy">
-        <p class="eyebrow">TPX v0.2 · an OAuth &amp; AAuth profile + reference provider · proof of concept</p>
-        <h1>Bring your own tokens to any LLM app <span class="or">or agent</span>.</h1>
+        <p class="eyebrow">TPX v0.2 · an OAuth 2.0 profile + reference provider · proof of concept</p>
+        <h1>Bring your own tokens to any LLM app.</h1>
         <p class="lede">
           tokenpony is the home of <strong>TPX</strong>, an OAuth 2.0 profile where apps ship without
-          API keys and you pay a token provider you choose, and its <strong>TPX-A</strong> profile, where
-          autonomous agents carry their own identity and spend a budget you approve. tokenpony is also
-          the reference provider implementing both end to end. The app, or agent, gets a metered budget.
-          You keep the reins.
+          API keys and you pay a token provider you choose. tokenpony is also the reference provider
+          implementing it end to end. The app gets a metered budget. You keep the reins. (For
+          autonomous agents there is <strong>TPX-A</strong>, an experimental extension described below.)
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://ponychat.tokenpony.dev">Try Pony Chat</a>
@@ -142,7 +141,7 @@ $ curl https://api.tokenpony.dev\
 
     <section id="agents" class="agents">
       <div class="wrap">
-        <p class="eyebrow">For agents · TPX-A</p>
+        <p class="eyebrow">For agents · TPX-A <span class="exp">experimental</span></p>
         <h2>Apps act for a person.<br />Agents can act for themselves.</h2>
         <p class="section-lede">
           The flow above is for apps a person is signed into. Autonomous agents are different:
@@ -150,7 +149,8 @@ $ curl https://api.tokenpony.dev\
           our binding of <a href="https://aauth.dev">AAuth</a> (Dick Hardt's agent-authorization
           protocol) and its AAuth-Budget extension. An agent gets a metered, identity-free budget
           that a person approves at a Person Server they choose. Same credits, same models, same
-          meter as the rest of tokenpony.
+          meter as the rest of tokenpony. TPX-A is experimental: TPX is the focus for now, and
+          this profile will change as the AAuth drafts evolve.
         </p>
         <div class="agent-grid">
           <article>
@@ -358,11 +358,6 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
     margin-block: 0.75rem 1.25rem;
   }
 
-  h1 .or {
-    color: var(--red);
-    white-space: nowrap;
-  }
-
   .lede {
     font-size: 1.15rem;
     max-width: 52ch;
@@ -546,6 +541,19 @@ $ curl https://api.tokenpony.dev/v1/chat/completions \
   /* Agents / TPX-A */
   .agents {
     padding-block: clamp(3rem, 7vw, 5rem);
+  }
+
+  .exp {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--red);
+    border: 1px solid var(--red);
+    border-radius: 3px;
+    padding: 0.1rem 0.4rem;
+    margin-left: 0.35rem;
+    vertical-align: middle;
   }
 
   .agents h2 {

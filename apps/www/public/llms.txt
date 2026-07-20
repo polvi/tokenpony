@@ -140,7 +140,10 @@ MUST: PKCE S256; validate iss; exact redirect_uris; request and read budgets via
 authorization_details; on 401 refresh, on invalid_grant re-authorize.
 SHOULD: use PAR and DPoP; introspect before large jobs; revoke unneeded grants.
 
-## Agents: AAuth-Budget / TPX-A (identity-free budgeted access)
+## Agents: AAuth-Budget / TPX-A (experimental, identity-free budgeted access)
+
+EXPERIMENTAL: TPX-A is an experimental extension. The TPX OAuth flow above is the
+stable path; this profile will change as the AAuth drafts evolve.
 
 Beyond the OAuth flow above, tokenpony is an AAuth resource + access server (the TPX-A
 profile of AAuth-Budget). An autonomous agent with its own Ed25519 identity gets a metered,

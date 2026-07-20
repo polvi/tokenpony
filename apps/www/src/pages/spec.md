@@ -1,7 +1,7 @@
 ---
 layout: ../layouts/Prose.astro
 title: "TPX v0.2: the Token Pony Express specification"
-description: "TPX v0.2: an OAuth 2.0 profile for metered LLM inference grants, plus TPX-A, the AAuth-Budget profile for autonomous agents."
+description: "TPX v0.2: an OAuth 2.0 profile for metered LLM inference grants, plus TPX-A, the experimental AAuth-Budget profile for autonomous agents."
 ---
 # TPX v0.2 Specification
 
@@ -445,7 +445,10 @@ An **app** MUST: use PKCE; validate `iss`; register exact redirect URIs; request
 | Nested error body at OAuth endpoints | Flat RFC 6749 errors at OAuth endpoints; nested body kept at the inference API |
 | Dashboard-only revocation | Dashboard + RFC 7009 for apps |
 
-## Appendix B. TPX-A: the AAuth-Budget profile (for agents)
+## Appendix B. TPX-A: the AAuth-Budget profile (for agents, experimental)
+
+Status: Experimental. The OAuth profile in the body of this specification is the stable
+core of TPX; TPX-A tracks the evolving AAuth drafts and will change as they do.
 
 TPX v0.2 authorizes apps acting for a signed-in person. For autonomous **agents** that carry
 their own cryptographic identity, tokenpony also implements **TPX-A**, the Token Pony Express

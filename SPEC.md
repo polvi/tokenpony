@@ -440,7 +440,10 @@ An **app** MUST: use PKCE; validate `iss`; register exact redirect URIs; request
 | Nested error body at OAuth endpoints | Flat RFC 6749 errors at OAuth endpoints; nested body kept at the inference API |
 | Dashboard-only revocation | Dashboard + RFC 7009 for apps |
 
-## Appendix B. TPX-A: the AAuth-Budget profile (for agents)
+## Appendix B. TPX-A: the AAuth-Budget profile (for agents, experimental)
+
+Status: Experimental. The OAuth profile in the body of this specification is the stable
+core of TPX; TPX-A tracks the evolving AAuth drafts and will change as they do.
 
 TPX v0.2 authorizes apps acting for a signed-in person. For autonomous **agents** that carry
 their own cryptographic identity, tokenpony also implements **TPX-A**, the Token Pony Express
