@@ -30,7 +30,7 @@ interface GrantCookie {
   rt: string;
   at: string;
   at_exp: number; // ms epoch
-  budget: number;
+  budget: number; // USD (TPX v0.3)
   resource: string;
   as_issuer: string;
 }
@@ -116,7 +116,7 @@ app.onError((err, c) => {
 });
 
 app.get('/', async (c) => {
-  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant');
+  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant3');
   if (!grant) return c.html(connectPage(c.env.DEFAULT_ISSUER));
   // Show live grant state from introspection when we can get it.
   let used = 0;
@@ -142,7 +142,9 @@ app.post('/connect', async (c) => {
   } catch {
     return c.html(connectPage(c.env.DEFAULT_ISSUER, 'That provider URL is not valid.'), 400);
   }
-  const budget = Number(form.budget) || 100_000;
+  // USD budgets from the fixed dropdown; fail closed on tampered forms.
+  const BUDGETS = [0.05, 0.1, 0.5];
+  const budget = BUDGETS.includes(Number(form.budget)) ? Number(form.budget) : 0.1;
 
   let disco: TpxDiscovery;
   let client: ClientAuth;
@@ -203,7 +205,7 @@ app.get('/callback', async (c) => {
     });
     writeJsonCookie(
       c,
-      'tpx_grant',
+      'tpx_grant3',
       grantFromTokens(tokens, disco.resource, disco.as.issuer),
       60 * 60 * 24 * 30,
     );
@@ -214,8 +216,8 @@ app.get('/callback', async (c) => {
 });
 
 app.post('/disconnect', async (c) => {
-  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant');
-  deleteCookie(c, 'tpx_grant', COOKIE_OPTS);
+  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant3');
+  deleteCookie(c, 'tpx_grant3', COOKIE_OPTS);
   // Good citizenship (spec 9.2): revoke the grant we no longer need.
   if (grant) {
     try {
@@ -231,7 +233,7 @@ app.post('/disconnect', async (c) => {
 
 // Proxy the provider's model list (tokens stay in the HttpOnly cookie).
 app.get('/models', async (c) => {
-  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant');
+  const grant = readJsonCookie<GrantCookie>(c, 'tpx_grant3');
   if (!grant) return c.json({ error: { code: 'not_connected', message: 'Connect a provider' } }, 401);
   const res = await fetch(`${grant.resource}/models`);
   return new Response(res.body, { status: res.status, headers: { 'content-type': 'application/json' } });
@@ -240,11 +242,11 @@ app.get('/models', async (c) => {
 // Proxy chat completions, streaming SSE straight through, refreshing the
 // short-lived access token as needed.
 app.post('/chat', async (c) => {
-  const stored = readJsonCookie<GrantCookie>(c, 'tpx_grant');
+  const stored = readJsonCookie<GrantCookie>(c, 'tpx_grant3');
   if (!stored) return c.json({ error: { code: 'not_connected', message: 'Connect a provider' } }, 401);
   const fresh = await freshGrant(c, stored);
   if (!fresh) {
-    deleteCookie(c, 'tpx_grant', COOKIE_OPTS);
+    deleteCookie(c, 'tpx_grant3', COOKIE_OPTS);
     return c.json({ error: { code: 'grant_dead', message: 'Grant expired or was revoked. Reconnect to continue.' } }, 401);
   }
   let { grant, refreshed } = fresh;
@@ -270,7 +272,7 @@ app.post('/chat', async (c) => {
       res = await upstream();
     } catch (err) {
       if (err instanceof TpxError && err.code === 'invalid_grant') {
-        deleteCookie(c, 'tpx_grant', COOKIE_OPTS);
+        deleteCookie(c, 'tpx_grant3', COOKIE_OPTS);
         return c.json({ error: { code: 'grant_dead', message: 'Grant expired or was revoked. Reconnect to continue.' } }, 401);
       }
       throw err;
@@ -286,7 +288,7 @@ app.post('/chat', async (c) => {
     const maxAge = 60 * 60 * 24 * 30;
     headers.append(
       'set-cookie',
-      `tpx_grant=${grantCookieValue(grant)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+      `tpx_grant3=${grantCookieValue(grant)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Lax`,
     );
   }
   return new Response(res.body, { status: res.status, headers });

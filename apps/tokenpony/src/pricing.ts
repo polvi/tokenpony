@@ -119,6 +119,21 @@ export function creditsFor(price: ModelPrice, t: TokenCounts): number {
 
 export const usd = (credits: number) => `$${(credits / 1_000_000).toFixed(credits < 10_000 ? 4 : 2)}`;
 
+/** Integer micro-USD to the USD number reported on the wire. */
+export const microToUsd = (micro: number) => micro / 1_000_000;
+
+/**
+ * USD-per-M-token rate to a USD-per-token decimal string (OpenRouter pricing
+ * shape). Goes through an integer so the output never uses scientific
+ * notation; exact for catalog rates with <= 6 decimals per M.
+ */
+export function perTokenPrice(perM: number): string {
+  const pico = Math.round(perM * 1_000_000); // integer USD per 1e12 tokens
+  if (pico === 0) return '0';
+  const s = String(pico).padStart(13, '0');
+  return `${Number(s.slice(0, -12))}.${s.slice(-12)}`.replace(/\.?0+$/, '');
+}
+
 // -- TPX-A budget amount <-> credits (seam contract section 6) ----------------
 // 1 credit = US$0.000001, so credits = amount * 1_000_000, exact both ways.
 const MAX_CREDITS = 9_007_199_254_740_991; // 2^53 - 1

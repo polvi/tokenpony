@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { maybeAutoTopup } from './billing';
 import { verifyDpopProof } from './dpop';
 import { MODELS, resolveModel, type ModelEntry } from './models';
-import { creditsFor, getPrices, priceFor, type ModelPrice, type TokenCounts } from './pricing';
+import { creditsFor, getPrices, microToUsd, perTokenPrice, priceFor, type ModelPrice, type TokenCounts } from './pricing';
 import { estimateTokens, jsonError, sha256Hex } from './util';
 import { commit, missionModels, release, reserve } from './aauth/missions';
 import { authenticateAAuth, aauthUnauthorized, buildAAuthChallenge } from './aauth/verify';
@@ -218,7 +218,7 @@ function normalizeCounts(raw: unknown, prompt: string, completion: string): Toke
   return { prompt_tokens, cached_tokens, completion_tokens };
 }
 
-/** OpenAI-compatible usage block, extended per TPX v0.2 (Section 8.3). */
+/** OpenAI-compatible usage block, extended per TPX v0.3 (Section 8.3). */
 function usageBlock(counts: TokenCounts, credits: number) {
   return {
     prompt_tokens: counts.prompt_tokens,
@@ -226,7 +226,7 @@ function usageBlock(counts: TokenCounts, credits: number) {
     completion_tokens: counts.completion_tokens,
     total_tokens: counts.prompt_tokens + counts.completion_tokens,
     prompt_tokens_details: { cached_tokens: counts.cached_tokens },
-    credits_charged: credits,
+    cost: microToUsd(credits),
   };
 }
 
@@ -295,21 +295,90 @@ api.get('/models', async (c) => {
         object: 'model',
         owned_by: m.owned_by,
         description: m.description,
+        // OpenRouter pricing shape: USD per token as decimal strings, "0" = free.
         pricing: await priceFor(c.env, m.cf).then((p) => ({
-          usd_per_m_input_tokens: p.inputPerM,
-          usd_per_m_cached_input_tokens: p.cachedInputPerM,
-          usd_per_m_output_tokens: p.outputPerM,
-          // TPX-A section 4.3: per-token rates in credits, as strings.
-          credits_per_token: {
-            input: String(p.inputPerM),
-            cached_input: String(p.cachedInputPerM),
-            output: String(p.outputPerM),
-          },
+          prompt: perTokenPrice(p.inputPerM),
+          completion: perTokenPrice(p.outputPerM),
+          request: '0',
+          input_cache_read: perTokenPrice(p.cachedInputPerM),
           source: prices[m.cf] ? 'cloudflare_catalog' : 'static',
         })),
       })),
     ),
   });
+});
+
+/**
+ * Spend summary for the presented credential, in USD (Section 8.2). Grant
+ * tokens see only their grant's budget and spend (Section 11 privacy);
+ * personal keys see account totals. Unlike inference auth, an exhausted
+ * budget or balance still answers 200 here.
+ */
+api.get('/credits', async (c) => {
+  const header = c.req.header('authorization') ?? '';
+  const token = header.replace(/^(Bearer|DPoP)\s+/i, '').trim();
+  if (!token) return unauthorized(c, 'Missing access token', false);
+  const hash = await sha256Hex(token);
+
+  if (token.startsWith('sk_')) {
+    const row = await c.env.DB.prepare(
+      `SELECT k.revoked, u.id AS user_id
+       FROM api_keys k JOIN users u ON u.id = k.user_id WHERE k.key_hash = ?`,
+    )
+      .bind(hash)
+      .first<{ revoked: number; user_id: string }>();
+    if (!row) return jsonError(401, 'invalid_token', 'Unknown API key');
+    if (row.revoked) return jsonError(401, 'invalid_token', 'API key revoked');
+    const totals = await c.env.DB.prepare(
+      `SELECT
+         (SELECT COALESCE(SUM(credits), 0) FROM payments WHERE user_id = ?1 AND status = 'paid') AS purchased,
+         (SELECT COALESCE(SUM(credits), 0) FROM usage_events WHERE user_id = ?1) AS used`,
+    )
+      .bind(row.user_id)
+      .first<{ purchased: number; used: number }>();
+    return c.json({
+      data: {
+        total_purchased: microToUsd(totals?.purchased ?? 0),
+        total_used: microToUsd(totals?.used ?? 0),
+      },
+    });
+  }
+
+  if (token.startsWith('tpx_at_')) {
+    const row = await c.env.DB.prepare(
+      `SELECT a.expires_at, a.dpop_jkt, g.status, g.budget_total, g.budget_used
+       FROM access_tokens a JOIN grants g ON g.id = a.grant_id
+       WHERE a.token_hash = ?`,
+    )
+      .bind(hash)
+      .first<{
+        expires_at: string;
+        dpop_jkt: string | null;
+        status: string;
+        budget_total: number;
+        budget_used: number;
+      }>();
+    if (!row) return unauthorized(c, 'Unknown access token');
+    if (Date.parse(`${row.expires_at}Z`) < Date.now())
+      return unauthorized(c, 'Access token expired');
+    if (row.status !== 'active') return unauthorized(c, 'Grant revoked');
+    if (row.dpop_jkt) {
+      const proof = c.req.header('dpop');
+      const jkt = proof
+        ? await verifyDpopProof({ proof, htm: c.req.method, htu: c.req.url, accessToken: token })
+        : null;
+      if (!jkt || jkt !== row.dpop_jkt)
+        return unauthorized(c, 'DPoP proof missing or bound to a different key');
+    }
+    return c.json({
+      data: {
+        total_purchased: microToUsd(row.budget_total),
+        total_used: microToUsd(row.budget_used),
+      },
+    });
+  }
+
+  return unauthorized(c, 'Unrecognized token format');
 });
 
 api.post('/chat/completions', async (c) => {

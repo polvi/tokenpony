@@ -5,12 +5,15 @@ import { digestsEqual, randomToken, sha256Hex } from './util';
 import { grantTuples, writeTuples } from './authz';
 import { loginRedirect, ensureUser, whoami } from './auth';
 import { MODELS } from './models';
+import { microToUsd, usd } from './pricing';
 import { verifyDpopProof } from './dpop';
 import { handleBudgetRelay } from './aauth/relay';
 import type { AppEnv, Bindings } from './types';
 
-// Budgets are credits (micro-USD): cap a single grant at $10.
-const MAX_BUDGET = 10_000_000;
+// Budgets arrive as USD numbers (TPX v0.3) and are stored as integer
+// micro-USD credits; cap a single grant at $10.
+const MAX_BUDGET_USD = 10;
+const MAX_BUDGET_MICRO = 10_000_000;
 const CODE_TTL_MS = 5 * 60 * 1000;
 const PAR_TTL_MS = 90 * 1000;
 export const ACCESS_TOKEN_TTL_S = 3600;
@@ -117,14 +120,22 @@ async function authenticateClient(
 
 // -- Authorization details (RFC 9396, type llm-inference) --------------------
 
+/** Wire shape: budget is a USD number (e.g. 0.10). */
 export interface LlmInferenceDetails {
   type: 'llm-inference';
   budget: number;
   models?: string[];
 }
 
+/** Parsed internal shape: budget_micro is integer micro-USD. */
+interface ParsedDetails {
+  type: 'llm-inference';
+  budget_micro: number;
+  models?: string[];
+}
+
 /** Strict fail-closed validation of the authorization_details parameter. */
-function parseAuthorizationDetails(raw: string): LlmInferenceDetails | string {
+function parseAuthorizationDetails(raw: string): ParsedDetails | string {
   let arr: unknown;
   try {
     arr = JSON.parse(raw);
@@ -138,8 +149,17 @@ function parseAuthorizationDetails(raw: string): LlmInferenceDetails | string {
   for (const key of Object.keys(d)) {
     if (!['type', 'budget', 'models'].includes(key)) return `Unrecognized llm-inference field '${key}'`;
   }
-  if (typeof d.budget !== 'number' || !Number.isInteger(d.budget) || d.budget < 1 || d.budget > MAX_BUDGET)
-    return `budget must be an integer 1..${MAX_BUDGET}`;
+  const b = d.budget;
+  // The epsilon absorbs binary float representation of <= 6-decimal values.
+  const micro = typeof b === 'number' && Number.isFinite(b) ? Math.round(b * 1_000_000) : NaN;
+  if (
+    !Number.isFinite(micro) ||
+    (b as number) <= 0 ||
+    Math.abs((b as number) * 1_000_000 - micro) > 1e-3 ||
+    micro < 1 ||
+    micro > MAX_BUDGET_MICRO
+  )
+    return `budget must be a positive USD number with at most 6 decimal places, max ${MAX_BUDGET_USD}`;
   if (d.models !== undefined) {
     if (!Array.isArray(d.models) || d.models.length === 0 || !d.models.every((m) => typeof m === 'string'))
       return 'models must be a non-empty array of strings';
@@ -148,13 +168,13 @@ function parseAuthorizationDetails(raw: string): LlmInferenceDetails | string {
       if (!known.has(m)) return `Unknown model '${m}'`;
     }
   }
-  const out: LlmInferenceDetails = { type: 'llm-inference', budget: d.budget };
+  const out: ParsedDetails = { type: 'llm-inference', budget_micro: micro };
   if (d.models) out.models = d.models as string[];
   return out;
 }
 
-export function detailsJson(budget: number, models: string[] | null): LlmInferenceDetails[] {
-  const d: LlmInferenceDetails = { type: 'llm-inference', budget };
+export function detailsJson(budgetMicro: number, models: string[] | null): LlmInferenceDetails[] {
+  const d: LlmInferenceDetails = { type: 'llm-inference', budget: microToUsd(budgetMicro) };
   if (models && models.length) d.models = models;
   return [d];
 }
@@ -166,7 +186,7 @@ interface AuthRequest {
   redirect_uri: string;
   code_challenge: string;
   state?: string;
-  details: LlmInferenceDetails;
+  details: ParsedDetails;
 }
 
 async function validateAuthRequest(
@@ -359,8 +379,10 @@ oauth.get('/authorize', async (c) => {
   if (!userId) return loginRedirect(c);
   const user = await ensureUser(c, userId);
 
-  const budget = req.details.budget;
-  const usdApprox = (budget / 1_000_000).toFixed(2);
+  const budgetMicro = req.details.budget_micro;
+  // Stale pushed requests from before the v0.3 cutover fail closed here.
+  if (!Number.isInteger(budgetMicro))
+    return oauthError(400, 'invalid_request', 'Expired authorization request; start over');
   const modelNote = req.details.models
     ? `<p class="muted">Limited to models: <code>${esc(req.details.models.join(', '))}</code></p>`
     : '';
@@ -369,19 +391,19 @@ oauth.get('/authorize', async (c) => {
     page(
       'Authorize · tokenpony',
       `<p class="eyebrow">Authorization request</p>
-<h1>${esc(client.name)} is asking for a credit budget.</h1>
+<h1>${esc(client.name)} is asking for a spending budget.</h1>
 <div class="card">
   <p><strong>${esc(client.name)}</strong> wants to spend up to
-     <strong>${budget.toLocaleString('en-US')} credits</strong> (about $${usdApprox}) from your tokenpony balance.</p>
+     <strong>${usd(budgetMicro)}</strong> from your tokenpony balance.</p>
   ${modelNote}
-  <p class="muted">Your balance: ${user.balance_credits.toLocaleString('en-US')} credits.
+  <p class="muted">Your balance: ${usd(user.balance_credits)}.
      The app never sees your keys or your identity, only this metered budget.
      You can revoke it any time from your dashboard.</p>
   <div class="row" style="margin-top:1rem">
     <form method="post" action="/authorize/decision">
       <input type="hidden" name="request_uri" value="${esc(resolved.requestUri!)}">
       <input type="hidden" name="decision" value="approve">
-      <button type="submit">Approve ${budget.toLocaleString('en-US')} credits</button>
+      <button type="submit">Approve ${usd(budgetMicro)}</button>
     </form>
     <form method="post" action="/authorize/decision">
       <input type="hidden" name="request_uri" value="${esc(resolved.requestUri!)}">
@@ -421,6 +443,10 @@ oauth.post('/authorize/decision', async (c) => {
     return c.redirect(dest.toString());
   }
 
+  // Stale pushed requests from before the v0.3 cutover fail closed here.
+  if (!Number.isInteger(req.details.budget_micro))
+    return oauthError(400, 'invalid_request', 'Expired authorization request; start over');
+
   const code = randomToken('tpxc_');
   await c.env.DB.prepare(
     `INSERT INTO auth_codes (code, client_id, user_id, budget, redirect_uri, expires_at, code_challenge, models)
@@ -430,7 +456,7 @@ oauth.post('/authorize/decision', async (c) => {
       code,
       req.client_id,
       userId,
-      req.details.budget,
+      req.details.budget_micro,
       req.redirect_uri,
       new Date(Date.now() + CODE_TTL_MS).toISOString(),
       req.code_challenge,
@@ -589,7 +615,7 @@ oauth.post('/introspect', async (c) => {
     token_type: at.dpop_jkt ? 'DPoP' : 'Bearer',
     exp: Math.floor(Date.parse(`${at.expires_at}Z`) / 1000),
     authorization_details: detailsJson(at.budget_total, at.models ? (JSON.parse(at.models) as string[]) : null),
-    budget_used: at.budget_used,
+    budget_used: microToUsd(at.budget_used),
   });
 });
 

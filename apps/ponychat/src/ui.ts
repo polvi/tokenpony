@@ -89,6 +89,7 @@ const chatCss = `
   #prompt { flex:1; border-radius:999px; padding-inline:1.1rem; }
   .meter { font-family:var(--mono); font-size:.72rem; color:var(--dim); }
   .meter b { color:var(--accent); font-weight:700; }
+  .msg .cost { display:block; font-family:var(--mono); font-size:.68rem; color:var(--dim); margin-top:.35rem; }
   .bar-right { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 `;
 
@@ -104,7 +105,7 @@ export function connectPage(defaultIssuer: string, error?: string): string {
     <h1>This app has <em>no API keys</em>. Bring your own tokens.</h1>
     <p class="muted">Pony Chat is a third-party app built on the Token Pony Express protocol.
     It ships with no LLM credentials and no inference bill. Connect a token provider you pay:
-    it asks for a metered credit budget, you approve it with a passkey, and every completion
+    it asks for a metered spending budget, you approve it with a passkey, and every completion
     is metered against that grant. Revoke it any time at your provider.</p>
     ${error ? `<p class="err">${esc(error)}</p>` : ''}
     <form class="card" method="post" action="/connect">
@@ -113,11 +114,11 @@ export function connectPage(defaultIssuer: string, error?: string): string {
         <input id="issuer" name="issuer" type="url" value="${esc(defaultIssuer)}" required>
       </div>
       <div class="field">
-        <label for="budget">Credit budget to request (1M credits = $1)</label>
+        <label for="budget">Budget to request (USD)</label>
         <select id="budget" name="budget">
-          <option value="50000">50,000 credits ($0.05)</option>
-          <option value="100000" selected>100,000 credits ($0.10)</option>
-          <option value="500000">500,000 credits ($0.50)</option>
+          <option value="0.05">$0.05</option>
+          <option value="0.10" selected>$0.10</option>
+          <option value="0.50">$0.50</option>
         </select>
       </div>
       <button type="submit">Connect provider →</button>
@@ -129,12 +130,19 @@ export function connectPage(defaultIssuer: string, error?: string): string {
   );
 }
 
+/** Format integer micro-USD as dollars (4 decimals under a cent, else 2). */
+const fmtUsd = (micro: number) => `$${(micro / 1_000_000).toFixed(micro < 10_000 ? 4 : 2)}`;
+
 export function chatPage(issuer: string, budget: number, used = 0): string {
+  // Budget and spend arrive as USD numbers; the meter accumulates in integer
+  // micro-USD client-side so floats never drift.
+  const budgetMicro = Math.round(budget * 1_000_000);
+  const usedMicro = Math.round(used * 1_000_000);
   return shell(
     'Pony Chat',
     `<header class="bar">
-  <span class="wordmark">pony<b>chat</b><span class="tag">third-party demo</span></span>
-  <span class="meter">grant <b id="used" data-init="${used}">${used.toLocaleString('en-US')}</b> / ${budget.toLocaleString('en-US')} credits</span>
+  <span class="wordmark">pony<b>chat</b><span class="tag">third-party demo</span><span class="tag" id="billing" hidden></span></span>
+  <span class="meter">spent <b id="used" data-init="${usedMicro}">${fmtUsd(usedMicro)}</b> / ${fmtUsd(budgetMicro)}<span id="convo" hidden> · this chat <b id="convo-total">$0.0000</b></span></span>
   <span class="bar-right">
     <a class="provider-chip" href="${esc(issuer)}/dashboard" target="_blank" rel="noopener">tokens by ${esc(new URL(issuer).host)} · manage balance ↗</a>
     <select id="model" class="quiet"></select>
@@ -161,13 +169,27 @@ const promptEl = document.getElementById('prompt');
 const modelSel = document.getElementById('model');
 const usedEl = document.getElementById('used');
 const history = [];
-let used = Number(usedEl.dataset.init) || 0;
+// The meter accumulates integer micro-USD; usage.cost arrives as USD.
+let usedMicro = Number(usedEl.dataset.init) || 0;
+let convoMicro = 0;
+const fmtUsd = (micro) => '$' + (micro / 1e6).toFixed(micro < 10000 ? 4 : 2);
+const perM = (s) => '$' + String(+(Number(s) * 1e6).toFixed(2));
 
 const DEFAULT_MODEL = 'llama-3.3-70b';
 fetch('/models').then(r => r.json()).then(body => {
-  for (const m of body.data ?? []) {
+  const models = body.data ?? [];
+  const allFree = models.length > 0 && models.every(m =>
+    Number(m.pricing?.prompt ?? 0) === 0 && Number(m.pricing?.completion ?? 0) === 0);
+  if (allFree) {
+    const badge = document.getElementById('billing');
+    badge.textContent = models[0].pricing?.source === 'subscription' ? 'subscription' : 'free';
+    badge.hidden = false;
+  }
+  for (const m of models) {
     const opt = document.createElement('option');
-    opt.value = m.id; opt.textContent = m.id;
+    opt.value = m.id;
+    opt.textContent = allFree || !m.pricing ? m.id
+      : m.id + ' \\u00b7 ' + perM(m.pricing.prompt) + ' in / ' + perM(m.pricing.completion) + ' out per M';
     if (m.id === DEFAULT_MODEL) opt.selected = true;
     modelSel.append(opt);
   }
@@ -207,7 +229,7 @@ composer.addEventListener('submit', async (e) => {
       return;
     }
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-    let buf = '', answer = '';
+    let buf = '', answer = '', msgMicro = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -222,9 +244,22 @@ composer.addEventListener('submit', async (e) => {
           const chunk = JSON.parse(payload);
           const delta = chunk.choices?.[0]?.delta?.content;
           if (delta) { answer += String(delta); out.textContent = answer; log.scrollTop = log.scrollHeight; }
-          if (chunk.usage) { used += chunk.usage.credits_charged ?? chunk.usage.total_tokens; usedEl.textContent = used.toLocaleString('en-US'); }
+          if (typeof chunk.usage?.cost === 'number') {
+            msgMicro += Math.round(chunk.usage.cost * 1e6);
+          }
         } catch {}
       }
+    }
+    if (msgMicro > 0) {
+      usedMicro += msgMicro;
+      convoMicro += msgMicro;
+      usedEl.textContent = fmtUsd(usedMicro);
+      document.getElementById('convo').hidden = false;
+      document.getElementById('convo-total').textContent = fmtUsd(convoMicro);
+      const cost = document.createElement('span');
+      cost.className = 'cost';
+      cost.textContent = fmtUsd(msgMicro);
+      out.append(cost);
     }
     history.push({ role: 'assistant', content: answer });
   } catch (err) {

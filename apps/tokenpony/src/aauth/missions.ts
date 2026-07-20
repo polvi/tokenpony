@@ -140,8 +140,6 @@ export function budgetState(mission: MissionRow) {
     active: mission.status === 'active',
     budget: { amount: creditsToAmount(mission.budget_total), currency: mission.currency },
     spent: { amount: creditsToAmount(mission.budget_used), currency: mission.currency },
-    credits: mission.budget_total,
-    credits_used: mission.budget_used,
   };
 }
 
