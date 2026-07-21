@@ -62,7 +62,7 @@ dashboard.get('/', async (c) => {
           const total = (checkoutAmountCents(p.usd, first, postageCents(c.env)) / 100).toFixed(2);
           return `<form method="post" action="/billing/checkout" class="inline">
                <input type="hidden" name="pack" value="${id}">
-               <button type="submit">Buy ${fmt(p.credits)} credits · $${total}</button>
+               <button type="submit">Top off $${p.usd} · pay $${total}</button>
              </form>`;
         })
         .join('')}</div>
@@ -83,7 +83,7 @@ dashboard.get('/', async (c) => {
     grants.results.map(
       (g) => `<tr>
         <td>${esc(g.app_name)}</td>
-        <td>${fmt(g.budget_used)} / ${fmt(g.budget_total)} credits</td>
+        <td>${usd(g.budget_used)} of ${usd(g.budget_total)}</td>
         <td>${g.status}</td>
         <td>${g.status === 'active' ? `<form method="post" action="/dashboard/grants/${g.id}/revoke" class="inline"><button class="danger">Revoke</button></form>` : ''}</td>
       </tr>`,
@@ -91,7 +91,7 @@ dashboard.get('/', async (c) => {
 
   const usageRows =
     usage.results.map(
-      (u) => `<tr><td class="mono">${esc(u.model)}</td><td>${fmt(u.prompt_tokens)}${u.cached_tokens ? ` <span class="muted">(${fmt(u.cached_tokens)} cached)</span>` : ''}</td><td>${fmt(u.completion_tokens)}</td><td>${fmt(u.credits)} <span class="muted">(${usd(u.credits)})</span></td><td class="muted">${u.created_at}Z</td></tr>`,
+      (u) => `<tr><td class="mono">${esc(u.model)}</td><td>${fmt(u.prompt_tokens)}${u.cached_tokens ? ` <span class="muted">(${fmt(u.cached_tokens)} cached)</span>` : ''}</td><td>${fmt(u.completion_tokens)}</td><td>${usd(u.credits)}</td><td class="muted">${u.created_at}Z</td></tr>`,
     ).join('') || '<tr><td colspan="5" class="muted">No usage yet.</td></tr>';
 
   const appRows =
@@ -102,10 +102,10 @@ dashboard.get('/', async (c) => {
   return c.html(
     page(
       'Dashboard · tokenpony',
-      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Credits land when Stripe confirms; refresh in a moment.</div>' : ''}
+      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Your balance updates when Stripe confirms; refresh in a moment.</div>' : ''}
 <p class="eyebrow">Your account</p>
-<h1>Balance: <span class="stat">${fmt(user.balance_credits)}</span> credits <span class="muted" style="font-size:1.1rem">(${usd(user.balance_credits)})</span></h1>
-<p class="muted">1 credit = $0.000001. Models are metered at Cloudflare's per-token rates; see <a href="/v1/models">/v1/models</a> for live pricing.</p>
+<h1>Balance: <span class="stat">${usd(user.balance_credits)}</span></h1>
+<p class="muted">Models are metered in USD at live per-token rates; see <a href="/v1/models">/v1/models</a> for pricing.</p>
 <p class="muted mono">${esc(user.id)}</p>
 ${billing}
 
@@ -114,20 +114,20 @@ ${
   auto?.stripe_payment_method_id
     ? `<p class="muted">Card on file: ····${esc(auto.card_last4 ?? '????')}. ${
         auto.autotopup_threshold && auto.autotopup_credits
-          ? `<strong>On:</strong> when your balance drops below ${fmt(auto.autotopup_threshold)} credits, we charge $${((checkoutAmountCents(auto.autotopup_credits / 1_000_000, false, postageCents(c.env))) / 100).toFixed(2)} for ${fmt(auto.autotopup_credits)} credits (includes postage).`
+          ? `<strong>On:</strong> when your balance drops below ${usd(auto.autotopup_threshold)}, we charge $${((checkoutAmountCents(auto.autotopup_credits / 1_000_000, false, postageCents(c.env))) / 100).toFixed(2)} to add ${usd(auto.autotopup_credits)} (includes postage).`
           : '<strong>Off.</strong> Enable it to refill automatically; auto top-offs are priced like any later top-off (face value + postage + card fees).'
       }</p>
 <form method="post" action="/dashboard/autotopup" class="row">
   <label class="muted">Below
     <select name="threshold">
-      <option value="50000">50,000 credits</option>
-      <option value="100000" selected>100,000 credits</option>
-      <option value="500000">500,000 credits</option>
+      <option value="50000">$0.05</option>
+      <option value="100000" selected>$0.10</option>
+      <option value="500000">$0.50</option>
     </select>
   </label>
-  <label class="muted">buy
+  <label class="muted">add
     <select name="pack">
-      ${Object.entries(PACKS).map(([id, p]) => `<option value="${id}">${fmt(p.credits)} credits</option>`).join('')}
+      ${Object.entries(PACKS).map(([id, p]) => `<option value="${id}">$${p.usd}</option>`).join('')}
     </select>
   </label>
   <button type="submit" name="action" value="enable">${auto.autotopup_threshold ? 'Update' : 'Enable'}</button>
@@ -148,7 +148,7 @@ ${
 </form>
 
 <h2>Recent usage</h2>
-<table><tr><th>Model</th><th>Prompt tokens</th><th>Completion tokens</th><th>Credits</th><th>When (UTC)</th></tr>${usageRows}</table>
+<table><tr><th>Model</th><th>Prompt tokens</th><th>Completion tokens</th><th>Cost</th><th>When (UTC)</th></tr>${usageRows}</table>
 
 <h2>Developer: your registered apps</h2>
 <table><tr><th>Name</th><th>client_id</th><th>redirect_uris</th></tr>${appRows}</table>

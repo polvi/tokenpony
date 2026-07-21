@@ -96,7 +96,7 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     if (!row) return jsonError(401, 'invalid_token', 'Unknown API key');
     if (row.revoked) return jsonError(401, 'invalid_token', 'API key revoked');
     if (row.balance_credits <= 0)
-      return jsonError(402, 'balance_exhausted', 'Your tokenpony credit balance is empty; top off at https://api.tokenpony.dev/dashboard');
+      return jsonError(402, 'balance_exhausted', 'Your tokenpony balance is empty; top off at https://api.tokenpony.dev/dashboard');
     return { userId: row.user_id, balance: row.balance_credits, apiKeyId: row.key_id };
   }
 

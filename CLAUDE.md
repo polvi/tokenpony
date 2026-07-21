@@ -19,9 +19,11 @@ repo layout. Commit and deploy freely once changes are verified.
 - `apps/www/public/llms.txt` must stay pure ASCII and consistent with SPEC.md.
 - `apps/www/src/pages/spec.md` is generated from SPEC.md (same body, frontmatter added);
   regenerate it whenever SPEC.md changes.
-- Credits are micro-USD (1 credit = $0.000001). Never grant free credits; the postage
-  billing model lives in `apps/tokenpony/src/billing.ts` (first top-off at cost, later
-  ones net one Forever stamp; `POSTAGE_CENTS` var tracks the USPS rate).
+- Credits are micro-USD (1 credit = $0.000001) and are internal only: every user-facing
+  surface (dashboard, consent, Stripe descriptions, error copy) shows USD. Never grant
+  free credits; the postage billing model lives in `apps/tokenpony/src/billing.ts`
+  (first top-off at cost, later ones net one Forever stamp; `POSTAGE_CENTS` var tracks
+  the USPS rate).
 - Model catalog: `apps/tokenpony/src/models.ts`; prices come live from `env.AI.models()`
   with static fallbacks in `pricing.ts`. `moonshotai/kimi-k3` stays out of the catalog
   until AI Gateway Unified Billing credits are purchased.

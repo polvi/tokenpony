@@ -100,7 +100,7 @@ billing.post('/checkout', requireSession, async (c) => {
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'usd',
     'line_items[0][price_data][unit_amount]': String(amount),
-    'line_items[0][price_data][product_data][name]': `tokenpony: ${pack.credits.toLocaleString('en-US')} credits (${label})`,
+    'line_items[0][price_data][product_data][name]': `tokenpony top-off: $${pack.usd} of inference (${label})`,
     'metadata[user_id]': user.id,
     'metadata[credits]': String(pack.credits),
     // Save the card for later off-session charges (auto top-off).
@@ -185,7 +185,7 @@ export async function maybeAutoTopup(env: Bindings, userId: string): Promise<voi
       payment_method: u.stripe_payment_method_id,
       off_session: 'true',
       confirm: 'true',
-      description: `tokenpony auto top-off: ${u.autotopup_credits.toLocaleString('en-US')} credits (includes postage)`,
+      description: `tokenpony auto top-off: $${(u.autotopup_credits / 1_000_000).toFixed(2)} of inference (includes postage)`,
       'metadata[user_id]': userId,
       'metadata[credits]': String(u.autotopup_credits),
       'metadata[autotopup]': '1',
