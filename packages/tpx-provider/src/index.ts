@@ -281,6 +281,26 @@ export function createTpxProvider(opts: TpxProviderOptions): Hono {
 
   const app = new Hono();
 
+  // CORS for the API and OAuth endpoints so browser apps can call them
+  // directly (spec: browser-based apps are public clients). Same shape as the
+  // hosted provider; consent pages stay CORS-free.
+  const CORS_PATHS = /^\/(v1|models|chat|credits|token|par|register|introspect|revoke|\.well-known)(\/|$)/;
+  app.use('*', async (c, next) => {
+    if (c.req.method === 'OPTIONS') {
+      return c.body(null, 204, {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, OPTIONS',
+        'access-control-allow-headers': 'authorization, content-type',
+        'access-control-max-age': '86400',
+      });
+    }
+    await next();
+    if (CORS_PATHS.test(new URL(c.req.url).pathname)) {
+      c.res.headers.set('access-control-allow-origin', '*');
+      c.res.headers.set('access-control-expose-headers', 'www-authenticate');
+    }
+  });
+
   // -- Discovery (RFC 9728 + RFC 8414) ---------------------------------------
 
   app.get('/.well-known/oauth-protected-resource', (c) => {

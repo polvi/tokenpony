@@ -17,7 +17,7 @@ app.onError((err, c) => {
 });
 
 // CORS for the API and OAuth endpoints so browser apps can call them directly.
-const CORS_PATHS = /^\/(v1|models|chat|token|par|register|introspect|revoke|grant|fund|\.well-known)(\/|$)/;
+const CORS_PATHS = /^\/(v1|models|chat|credits|token|par|register|introspect|revoke|grant|fund|\.well-known)(\/|$)/;
 app.use('*', async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     return c.body(null, 204, {
