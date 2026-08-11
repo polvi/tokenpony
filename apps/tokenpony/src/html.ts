@@ -11,6 +11,7 @@ export function page(title: string, body: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
+<script src="https://backtalk.proc.io/w.js" data-key="pk_AdJaijKIW6XrcdqN" data-release="v1" defer></script>
 <style>
   :root {
     --paper:#fbf8f0; --panel:#f3eee1; --card:#fff; --ink:#1d2233; --muted:#5c6072;
