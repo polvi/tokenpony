@@ -204,7 +204,7 @@ async function validateAuthRequest(
     return { err: 'invalid_target', desc: `Unknown resource; this provider serves ${env.ISSUER}` };
   if (!q.authorization_details)
     return { err: 'invalid_request', desc: 'authorization_details is required' };
-  const details = parseAuthorizationDetails(q.authorization_details, c.env);
+  const details = parseAuthorizationDetails(q.authorization_details, env);
   if (typeof details === 'string')
     return { err: 'invalid_authorization_details', desc: details };
   return {
