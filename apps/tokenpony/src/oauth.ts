@@ -135,7 +135,7 @@ interface ParsedDetails {
 }
 
 /** Strict fail-closed validation of the authorization_details parameter. */
-function parseAuthorizationDetails(raw: string): ParsedDetails | string {
+function parseAuthorizationDetails(raw: string, env: { MODEL_FILTER?: string }): ParsedDetails | string {
   let arr: unknown;
   try {
     arr = JSON.parse(raw);
@@ -163,7 +163,7 @@ function parseAuthorizationDetails(raw: string): ParsedDetails | string {
   if (d.models !== undefined) {
     if (!Array.isArray(d.models) || d.models.length === 0 || !d.models.every((m) => typeof m === 'string'))
       return 'models must be a non-empty array of strings';
-    const known = new Set(catalog(c.env).map((m) => m.id));
+    const known = new Set(catalog(env).map((m) => m.id));
     for (const m of d.models as string[]) {
       if (!known.has(m)) return `Unknown model '${m}'`;
     }
@@ -204,7 +204,7 @@ async function validateAuthRequest(
     return { err: 'invalid_target', desc: `Unknown resource; this provider serves ${env.ISSUER}` };
   if (!q.authorization_details)
     return { err: 'invalid_request', desc: 'authorization_details is required' };
-  const details = parseAuthorizationDetails(q.authorization_details);
+  const details = parseAuthorizationDetails(q.authorization_details, c.env);
   if (typeof details === 'string')
     return { err: 'invalid_authorization_details', desc: details };
   return {
