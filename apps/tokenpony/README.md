@@ -80,3 +80,19 @@ A cron trigger (`17 * * * *`, `src/sweeper.ts`) sweeps expired ephemeral OAuth r
 PAR requests and access tokens past their stored expiry, auth codes older than an hour
 (or spent and expired), and rotated/revoked refresh tokens older than seven days (kept
 that long so reuse stays detectable). Live grants are never touched.
+
+## Self-hosted on proc-dev (`--env procdev`)
+
+The `procdev` environment deploys this worker to the proc-0 Workers platform
+(`CLOUDFLARE_API_BASE_URL=https://mf.tailb55c1.ts.net/client/v4`, see
+proc-infra `clusters/proc-dev/miniflare/`), where `env.AI` is backed by the
+self-hosted `qwen3.8-27b` (catalog id `@proc/qwen3.8-27b`) and the extra
+`TAILNET` service binding makes anyone on the tailnet a signed-in user
+(`ts:<login>`, `src/auth.ts` `whoami`). That binding exists only in the
+`procdev` environment: on Cloudflare `env.TAILNET` is undefined and sign-in
+stays AuthGravity passkeys. The platform's ingress proxy is what makes the
+identity headers trustworthy (it strips them from anything that did not come
+through a tailscale proxy pod), so no verification lives in this code.
+
+    bunx wrangler deploy --env procdev
+    bunx wrangler d1 migrations apply tokenpony --remote --env procdev

@@ -39,6 +39,8 @@
       "workers_dev": true,
       "triggers": { "crons": ["17 * * * *"] },
       "ai": { "binding": "AI" },
+      // tailnet identity: trusted sign-in for anyone on the tailnet (platform-only binding)
+      "services": [{ "binding": "TAILNET", "service": "mf-tailnet" }],
       "d1_databases": [
         {
           "binding": "DB",

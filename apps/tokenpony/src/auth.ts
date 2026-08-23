@@ -10,8 +10,18 @@ export interface SessionUser {
 // No free credits: accounts start empty and top off via Stripe ($1 minimum).
 const STARTER_BALANCE = 0;
 
-/** Validate the AuthGravity session by forwarding the cookie (or bearer session id). */
+/** Tailnet users are `ts:<login>`; AuthGravity users keep their UUID. */
+export const tailnetUserId = (login: string) => `ts:${login}`;
+
+/**
+ * Who is signed in: the tailnet identity when the platform vouches for one
+ * (self-hosted only, see TailnetBinding), else the AuthGravity session.
+ */
 export async function whoami(c: Context<AppEnv>): Promise<string | null> {
+  if (c.env.TAILNET) {
+    const who = await c.env.TAILNET.identity(c.req.raw).catch(() => null);
+    if (who?.login) return tailnetUserId(who.login);
+  }
   const headers: Record<string, string> = {};
   const cookie = c.req.header('cookie');
   const auth = c.req.header('authorization');
