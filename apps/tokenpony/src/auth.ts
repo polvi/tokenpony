@@ -19,7 +19,9 @@ export const tailnetUserId = (login: string) => `ts:${login}`;
  */
 export async function whoami(c: Context<AppEnv>): Promise<string | null> {
   if (c.env.TAILNET) {
-    const who = await c.env.TAILNET.identity(c.req.raw).catch(() => null);
+    // headers only: a Request whose body was already read cannot cross RPC
+    const probe = new Request(c.req.url, { headers: c.req.raw.headers });
+    const who = await c.env.TAILNET.identity(probe).catch(() => null);
     if (who?.login) return tailnetUserId(who.login);
   }
   const headers: Record<string, string> = {};

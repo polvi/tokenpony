@@ -96,3 +96,9 @@ through a tailscale proxy pod), so no verification lives in this code.
 
     bunx wrangler deploy --env procdev
     bunx wrangler d1 migrations apply tokenpony --remote --env procdev
+
+`apps/ponychat` has the same `procdev` environment (KV + tailnet vars) and
+completes the whole TPX grant flow against this API inside the platform:
+`bunx wrangler deploy --env procdev` in `apps/ponychat`, then open
+https://ponychat.tailb55c1.ts.net, connect (the consent page already knows
+you from the tailnet), and chat with `qwen3.8-27b`.

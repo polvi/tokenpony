@@ -19,5 +19,17 @@
   },
   "routes": [
     { "pattern": "ponychat.tokenpony.dev", "custom_domain": true }
-  ]
+  ],
+  // proc-dev: the self-hosted platform, talking to the tokenpony-api deployed there
+  "env": {
+    "procdev": {
+      "name": "ponychat",
+      "workers_dev": true,
+      "kv_namespaces": [{ "binding": "PONYCHAT_KV", "id": "4ab2757c2ac94a669fac30a1a6af361b" }],
+      "vars": {
+        "APP_URL": "https://ponychat.tailb55c1.ts.net",
+        "DEFAULT_ISSUER": "https://tokenpony-api.tailb55c1.ts.net"
+      }
+    }
+  }
 }
