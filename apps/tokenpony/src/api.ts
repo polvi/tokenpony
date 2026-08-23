@@ -268,7 +268,7 @@ function chatContent(result: Record<string, unknown>): string {
  * Billing and must be routed through a gateway; @cf models run direct.
  */
 function gatewayOptions(c: Context<AppEnv>, model: ModelEntry) {
-  if (model.cf.startsWith('@cf/')) return undefined;
+  if (model.cf.startsWith('@cf/') || model.cf.startsWith('@proc/')) return undefined;
   return { gateway: { id: c.env.AI_GATEWAY_ID } } as never;
 }
 

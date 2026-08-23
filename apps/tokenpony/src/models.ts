@@ -10,6 +10,15 @@ export interface ModelEntry {
 }
 
 export const MODELS: ModelEntry[] = [
+  // Self-hosted on proc-0 (vLLM behind the platform's AI binding). The
+  // `@proc/` namespace is what the proc-dev platform's env.AI.models() reports.
+  {
+    id: 'qwen3.8-27b',
+    cf: '@proc/qwen3.8-27b',
+    api: 'chat',
+    owned_by: 'proc',
+    description: 'Qwen 3.8 27B (FP8) self-hosted on proc-0 via vLLM, 131k context, tools + reasoning',
+  },
   // kimi-k3 (moonshotai/kimi-k3, partner catalog) is plumbed and priced in
   // pricing.ts; re-add here once Unified Billing credits are purchased.
   {

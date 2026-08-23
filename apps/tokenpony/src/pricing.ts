@@ -17,6 +17,8 @@ export interface ModelPrice {
  * and doesn't appear in env.AI.models(); rates from the Cloudflare dashboard.
  */
 const STATIC_PRICES: Record<string, ModelPrice> = {
+  // proc-0 self-hosted; the platform's live catalog carries the same price
+  '@proc/qwen3.8-27b': { inputPerM: 0.1, cachedInputPerM: 0.1, outputPerM: 0.4 },
   'moonshotai/kimi-k3': { inputPerM: 3.0, cachedInputPerM: 0.3, outputPerM: 15.0 },
 };
 

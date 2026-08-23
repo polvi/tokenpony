@@ -29,5 +29,30 @@
   },
   "routes": [
     { "pattern": "api.tokenpony.dev", "custom_domain": true }
-  ]
+  ],
+  // proc-dev: the self-hosted platform (wrangler deploy --env procdev with
+  // CLOUDFLARE_API_BASE_URL=https://mf.tailb55c1.ts.net/client/v4). Bindings
+  // are not inherited by environments, so they are repeated here.
+  "env": {
+    "procdev": {
+      "name": "tokenpony-api",
+      "workers_dev": true,
+      "triggers": { "crons": ["17 * * * *"] },
+      "ai": { "binding": "AI" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "tokenpony",
+          "database_id": "b5e41cbd-f1d3-4f32-b17f-7f982c5c2896"
+        }
+      ],
+      "vars": {
+        "AI_GATEWAY_ID": "tokenpony",
+        "POSTAGE_CENTS": "82",
+        "ISSUER": "https://tokenpony-api.tailb55c1.ts.net",
+        "AUTHGRAVITY_URL": "https://authgravity.tokenpony.dev",
+        "WWW_URL": "https://tokenpony-www.tailb55c1.ts.net"
+      }
+    }
+  }
 }
