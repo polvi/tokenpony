@@ -4,7 +4,7 @@ import { esc, page } from './html';
 import { digestsEqual, randomToken, sha256Hex } from './util';
 import { grantTuples, writeTuples } from './authz';
 import { loginRedirect, ensureUser, whoami } from './auth';
-import { MODELS } from './models';
+import { catalog } from './models';
 import { microToUsd, usd } from './pricing';
 import { verifyDpopProof } from './dpop';
 import { handleBudgetRelay } from './aauth/relay';
@@ -163,7 +163,7 @@ function parseAuthorizationDetails(raw: string): ParsedDetails | string {
   if (d.models !== undefined) {
     if (!Array.isArray(d.models) || d.models.length === 0 || !d.models.every((m) => typeof m === 'string'))
       return 'models must be a non-empty array of strings';
-    const known = new Set(MODELS.map((m) => m.id));
+    const known = new Set(catalog(c.env).map((m) => m.id));
     for (const m of d.models as string[]) {
       if (!known.has(m)) return `Unknown model '${m}'`;
     }

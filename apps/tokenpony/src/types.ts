@@ -21,6 +21,8 @@ export interface TailnetBinding {
 /** Secrets are optional: billing and authz writes degrade gracefully until set. */
 export type Bindings = Env & {
   TAILNET?: TailnetBinding;
+  /** Comma-separated upstream-id prefixes this deployment serves (see models.ts catalog()). */
+  MODEL_FILTER?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   AUTHGRAVITY_SERVICE_TOKEN?: string;

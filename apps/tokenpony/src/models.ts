@@ -65,6 +65,20 @@ export const MODELS: ModelEntry[] = [
   },
 ];
 
-export function resolveModel(id: string): ModelEntry | undefined {
-  return MODELS.find((m) => m.id === id || m.cf === id);
+/**
+ * The catalog a deployment actually serves. MODEL_FILTER (comma-separated
+ * prefixes of the upstream `cf` id, e.g. "@proc/") narrows the static list
+ * to what the AI binding behind this deployment really runs; unset means
+ * the full Workers AI list. Everything that lists or accepts a model goes
+ * through here, so a filtered-out id is unknown rather than silently
+ * served (and priced) as something else.
+ */
+export function catalog(env: { MODEL_FILTER?: string }): ModelEntry[] {
+  const prefixes = (env.MODEL_FILTER ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!prefixes.length) return MODELS;
+  return MODELS.filter((m) => prefixes.some((p) => m.cf.startsWith(p)));
+}
+
+export function resolveModel(id: string, env: { MODEL_FILTER?: string } = {}): ModelEntry | undefined {
+  return catalog(env).find((m) => m.id === id || m.cf === id);
 }

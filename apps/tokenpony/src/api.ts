@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { maybeAutoTopup } from './billing';
 import { verifyDpopProof } from './dpop';
-import { MODELS, resolveModel, type ModelEntry } from './models';
+import { catalog, resolveModel, type ModelEntry } from './models';
 import { creditsFor, getPrices, microToUsd, perTokenPrice, priceFor, type ModelPrice, type TokenCounts } from './pricing';
 import { estimateTokens, jsonError, sha256Hex } from './util';
 import { commit, missionModels, release, reserve } from './aauth/missions';
@@ -290,7 +290,7 @@ api.get('/models', async (c) => {
   return c.json({
     object: 'list',
     data: await Promise.all(
-      MODELS.map(async (m) => ({
+      catalog(c.env).map(async (m) => ({
         id: m.id,
         object: 'model',
         owned_by: m.owned_by,
@@ -394,7 +394,7 @@ api.post('/chat/completions', async (c) => {
   if (!body.model || !Array.isArray(body.messages) || body.messages.length === 0)
     return jsonError(400, 'invalid_request', '`model` and `messages` are required');
 
-  const model = resolveModel(body.model);
+  const model = resolveModel(body.model, c.env);
   if (!model)
     return jsonError(404, 'model_not_found', `Unknown model '${body.model}'; see /v1/models`);
   // Model restriction. The AAuth path uses TPX-A's code `model_not_allowed`.
