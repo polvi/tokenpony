@@ -3,6 +3,13 @@ import { jsonError } from './util';
 import { requireSession } from './auth';
 import type { AppEnv, Bindings } from './types';
 
+/**
+ * Deployment metering mode. `METERING=off` (self-hosted, internal use) keeps
+ * the usage ledger and budget caps but never gates on balance, debits it, or
+ * talks to Stripe, and the /billing routes disappear. Anything else meters.
+ */
+export const isMetered = (env: { METERING?: string }) => env.METERING !== 'off';
+
 // Credits sell at face value: $1 buys 1,000,000 credits' worth of inference.
 export const PACKS: Record<string, { usd: number; credits: number }> = {
   demo: { usd: 1, credits: 1_000_000 },
@@ -79,6 +86,12 @@ async function ensureCustomer(env: Bindings, userId: string): Promise<string | n
 }
 
 export const billing = new Hono<AppEnv>();
+
+billing.use('*', async (c, next) => {
+  if (!isMetered(c.env))
+    return jsonError(404, 'not_found', 'Billing is disabled on this deployment');
+  await next();
+});
 
 billing.post('/checkout', requireSession, async (c) => {
   if (!c.env.STRIPE_SECRET_KEY)

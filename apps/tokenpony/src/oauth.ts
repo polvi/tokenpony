@@ -5,6 +5,7 @@ import { digestsEqual, randomToken, sha256Hex } from './util';
 import { grantTuples, writeTuples } from './authz';
 import { loginRedirect, ensureUser, whoami } from './auth';
 import { catalog } from './models';
+import { isMetered } from './billing';
 import { microToUsd, usd } from './pricing';
 import { verifyDpopProof } from './dpop';
 import { handleBudgetRelay } from './aauth/relay';
@@ -396,7 +397,7 @@ oauth.get('/authorize', async (c) => {
   <p><strong>${esc(client.name)}</strong> wants to spend up to
      <strong>${usd(budgetMicro)}</strong> from your tokenpony balance.</p>
   ${modelNote}
-  <p class="muted">Your balance: ${usd(user.balance_credits)}.
+  <p class="muted">${isMetered(c.env) ? `Your balance: ${usd(user.balance_credits)}.` : 'This deployment is unmetered; the budget caps the app without charging you.'}
      The app never sees your keys or your identity, only this metered budget.
      You can revoke it any time from your dashboard.</p>
   <div class="row" style="margin-top:1rem">

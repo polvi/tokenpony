@@ -53,6 +53,7 @@
         "POSTAGE_CENTS": "82",
         "ISSUER": "https://tokenpony-api.tailb55c1.ts.net",
         "MODEL_FILTER": "@proc/",
+        "METERING": "off",
         "AUTHGRAVITY_URL": "https://authgravity.tokenpony.dev",
         "WWW_URL": "https://tokenpony-www.tailb55c1.ts.net"
       }

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { maybeAutoTopup } from './billing';
+import { isMetered, maybeAutoTopup } from './billing';
 import { verifyDpopProof } from './dpop';
 import { catalog, resolveModel, type ModelEntry } from './models';
 import { creditsFor, getPrices, microToUsd, perTokenPrice, priceFor, type ModelPrice, type TokenCounts } from './pricing';
@@ -71,7 +71,7 @@ async function authenticateAAuthSpender(c: Context<AppEnv>): Promise<Spender | R
   if (!user) return jsonError(402, 'balance_exhausted', 'funding account not found');
   return {
     userId: m.user_id,
-    balance: user.balance_credits,
+    balance: isMetered(c.env) ? user.balance_credits : Infinity,
     mission: { id: m.id, remaining: m.budget_total - m.budget_used - m.reserved, models: missionModels(m) },
   };
 }
@@ -95,9 +95,13 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
       .first<{ key_id: string; revoked: number; user_id: string; balance_credits: number }>();
     if (!row) return jsonError(401, 'invalid_token', 'Unknown API key');
     if (row.revoked) return jsonError(401, 'invalid_token', 'API key revoked');
-    if (row.balance_credits <= 0)
-      return jsonError(402, 'balance_exhausted', 'Your tokenpony balance is empty; top off at https://api.tokenpony.dev/dashboard');
-    return { userId: row.user_id, balance: row.balance_credits, apiKeyId: row.key_id };
+    if (isMetered(c.env) && row.balance_credits <= 0)
+      return jsonError(402, 'balance_exhausted', `Your tokenpony balance is empty; top off at ${c.env.ISSUER}/dashboard`);
+    return {
+      userId: row.user_id,
+      balance: isMetered(c.env) ? row.balance_credits : Infinity,
+      apiKeyId: row.key_id,
+    };
   }
 
   if (token.startsWith('tpx_at_')) {
@@ -142,11 +146,11 @@ async function authenticate(c: Context<AppEnv>): Promise<Spender | Response> {
     const remaining = row.budget_total - row.budget_used;
     if (remaining <= 0)
       return jsonError(402, 'budget_exhausted', 'Grant budget spent; request a new authorization');
-    if (row.balance_credits <= 0)
+    if (isMetered(c.env) && row.balance_credits <= 0)
       return jsonError(402, 'balance_exhausted', "The user's provider balance is empty");
     return {
       userId: row.user_id,
-      balance: row.balance_credits,
+      balance: isMetered(c.env) ? row.balance_credits : Infinity,
       grant: {
         id: row.grant_id,
         remaining,
@@ -167,10 +171,6 @@ async function debit(
   reserved?: number,
 ): Promise<void> {
   const stmts = [
-    c.env.DB.prepare('UPDATE users SET balance_credits = balance_credits - ? WHERE id = ?').bind(
-      credits,
-      spender.userId,
-    ),
     c.env.DB.prepare(
       `INSERT INTO usage_events (id, user_id, grant_id, api_key_id, model, prompt_tokens, cached_tokens, completion_tokens, credits)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -186,6 +186,16 @@ async function debit(
       credits,
     ),
   ];
+  // Unmetered deployments keep the usage ledger but never move the balance;
+  // grant and mission budgets still accrue below, staying meaningful as caps.
+  if (isMetered(c.env)) {
+    stmts.push(
+      c.env.DB.prepare('UPDATE users SET balance_credits = balance_credits - ? WHERE id = ?').bind(
+        credits,
+        spender.userId,
+      ),
+    );
+  }
   if (spender.grant) {
     stmts.push(
       c.env.DB.prepare('UPDATE grants SET budget_used = budget_used + ? WHERE id = ?').bind(
@@ -200,7 +210,7 @@ async function debit(
     await commit(c.env.DB, spender.mission.id, reserved, credits);
   }
   // Refill the balance off-session if the user opted into auto top-off.
-  c.executionCtx.waitUntil(maybeAutoTopup(c.env, spender.userId));
+  if (isMetered(c.env)) c.executionCtx.waitUntil(maybeAutoTopup(c.env, spender.userId));
 }
 
 interface RawUsage {

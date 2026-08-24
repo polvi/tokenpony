@@ -56,6 +56,12 @@ per-model rates pulled live from the Workers AI catalog via `env.AI.models()` (c
 isolate, `src/pricing.ts`), with static fallbacks for models the catalog doesn't report.
 `usage.cost` is returned on every completion; the debit is recorded in `usage_events`.
 
+Setting the `METERING` var to `off` (the procdev environment does) turns the deployment
+unmetered: usage is still priced and recorded in `usage_events`, and grant/mission budgets
+still accrue and cap spend, but balances are never gated or debited, Stripe is never
+called, and the `/billing` routes answer 404. Intended for internal deployments; leave
+unset on Cloudflare.
+
 `moonshotai/kimi-k3` ($3.00/M input, $0.30/M cached input, $15.00/M output) is plumbed
 (partner models route through the AI Gateway named by the `AI_GATEWAY_ID` var, currently
 `tokenpony`) and statically priced, but is not in the served catalog: it bills through AI
@@ -93,6 +99,11 @@ self-hosted `qwen3.8-27b` (catalog id `@proc/qwen3.8-27b`) and the extra
 stays AuthGravity passkeys. The platform's ingress proxy is what makes the
 identity headers trustworthy (it strips them from anything that did not come
 through a tailscale proxy pod), so no verification lives in this code.
+
+The environment also sets `MODEL_FILTER=@proc/` (serve only the platform's
+models; unset, the catalog is the Workers AI list and `@proc/` entries are
+excluded) and `METERING=off` (internal use: usage is recorded, nothing is
+charged, no Stripe).
 
     bunx wrangler deploy --env procdev
     bunx wrangler d1 migrations apply tokenpony --remote --env procdev

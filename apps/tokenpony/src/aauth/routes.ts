@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppEnv, Bindings } from '../types';
 import { esc, page } from '../html';
 import { requireSession } from '../auth';
+import { isMetered } from '../billing';
 import { getJwks } from './keys';
 import { authenticateAAuth, aauthUnauthorized } from './verify';
 import { budgetState, getMission } from './missions';
@@ -64,7 +65,7 @@ aauth.get('/fund', async (c) => {
            </form>`
   }
 </div>
-<p class="muted">Your balance: ${c.get('user').balance_credits.toLocaleString('en-US')} credits.
+<p class="muted">${isMetered(c.env) ? `Your balance: ${c.get('user').balance_credits.toLocaleString('en-US')} credits.` : 'This deployment is unmetered; the budget caps the agent without charging you.'}
    You can stop backing this mission any time by revoking it from your dashboard.</p>`,
     ),
   );

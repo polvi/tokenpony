@@ -23,6 +23,8 @@ export type Bindings = Env & {
   TAILNET?: TailnetBinding;
   /** Comma-separated upstream-id prefixes this deployment serves (see models.ts catalog()). */
   MODEL_FILTER?: string;
+  /** "off" keeps usage accounting but disables spend gates, debits, and Stripe (see billing.ts isMetered()). */
+  METERING?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   AUTHGRAVITY_SERVICE_TOKEN?: string;

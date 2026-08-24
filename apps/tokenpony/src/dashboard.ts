@@ -4,7 +4,7 @@ import { randomToken, sha256Hex } from './util';
 import { applicationTuples, checkPermission, writeTuples } from './authz';
 import { revokeGrant } from './oauth';
 import { requireSession } from './auth';
-import { PACKS, checkoutAmountCents, hasPaidBefore, postageCents } from './billing';
+import { PACKS, checkoutAmountCents, hasPaidBefore, isMetered, postageCents } from './billing';
 import { usd } from './pricing';
 import type { AppEnv } from './types';
 
@@ -43,15 +43,18 @@ dashboard.get('/', async (c) => {
       .all<{ client_id: string; name: string; redirect_uris: string; created_at: string }>(),
   ]);
 
-  const stripeReady = Boolean(c.env.STRIPE_SECRET_KEY);
+  const metered = isMetered(c.env);
+  const stripeReady = metered && Boolean(c.env.STRIPE_SECRET_KEY);
   const paid = c.req.query('paid');
 
-  const first = !(await hasPaidBefore(c.env.DB, user.id));
-  const auto = await c.env.DB.prepare(
-    'SELECT card_last4, stripe_payment_method_id, autotopup_threshold, autotopup_credits FROM users WHERE id = ?',
-  )
-    .bind(user.id)
-    .first<{ card_last4: string | null; stripe_payment_method_id: string | null; autotopup_threshold: number | null; autotopup_credits: number | null }>();
+  const first = metered && !(await hasPaidBefore(c.env.DB, user.id));
+  const auto = metered
+    ? await c.env.DB.prepare(
+        'SELECT card_last4, stripe_payment_method_id, autotopup_threshold, autotopup_credits FROM users WHERE id = ?',
+      )
+        .bind(user.id)
+        .first<{ card_last4: string | null; stripe_payment_method_id: string | null; autotopup_threshold: number | null; autotopup_credits: number | null }>()
+    : null;
   const stampUsd = (postageCents(c.env) / 100).toFixed(2);
   const feeNote = first
     ? `Your first top-off is at cost: you pay only the card fees. After that, each top-off adds postage, the price of one US Forever stamp (currently $${stampUsd}).`
@@ -99,12 +102,8 @@ dashboard.get('/', async (c) => {
       (a) => `<tr><td>${esc(a.name)}</td><td class="mono">${esc(a.client_id)}</td><td class="mono">${esc((JSON.parse(a.redirect_uris) as string[]).join(', '))}</td></tr>`,
     ).join('') || '<tr><td colspan="3" class="muted">No registered apps.</td></tr>';
 
-  return c.html(
-    page(
-      'Dashboard · tokenpony',
-      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Your balance updates when Stripe confirms; refresh in a moment.</div>' : ''}
-<p class="eyebrow">Your account</p>
-<h1>Balance: <span class="stat">${usd(user.balance_credits)}</span></h1>
+  const accountSection = metered
+    ? `<h1>Balance: <span class="stat">${usd(user.balance_credits)}</span></h1>
 <p class="muted">Models are metered in USD at live per-token rates; see <a href="/v1/models">/v1/models</a> for pricing.</p>
 <p class="muted mono">${esc(user.id)}</p>
 ${billing}
@@ -134,13 +133,23 @@ ${
   ${auto.autotopup_threshold ? '<button type="submit" name="action" value="disable" class="quiet">Disable</button>' : ''}
 </form>`
     : '<p class="muted">Complete a top-off first. Your card is saved securely with Stripe at checkout, and you can then have the barn refill itself.</p>'
-}
+}`
+    : `<h1>Unmetered</h1>
+<p class="muted">This deployment records usage and never charges; see <a href="/v1/models">/v1/models</a> for the catalog.</p>
+<p class="muted mono">${esc(user.id)}</p>`;
+
+  return c.html(
+    page(
+      'Dashboard · tokenpony',
+      `${paid ? '<div class="card" style="border-color:var(--blue)"><strong>Payment received.</strong> Your balance updates when Stripe confirms; refresh in a moment.</div>' : ''}
+<p class="eyebrow">Your account</p>
+${accountSection}
 
 <h2>Connected apps (TPX grants)</h2>
 <table><tr><th>App</th><th>Budget used</th><th>Status</th><th></th></tr>${grantRows}</table>
 
 <h2>Personal API keys</h2>
-<p class="muted">Use directly against <code>https://api.tokenpony.dev/v1</code> with any OpenAI SDK.</p>
+<p class="muted">Use directly against <code>${esc(c.env.ISSUER)}/v1</code> with any OpenAI SDK.</p>
 <table><tr><th>Label</th><th>Id</th><th>Status</th><th></th></tr>${keyRows}</table>
 <form method="post" action="/dashboard/keys" class="row" style="margin-top:.75rem">
   <input type="text" name="label" placeholder="key label" required maxlength="64">
@@ -166,6 +175,7 @@ ${
 });
 
 dashboard.post('/autotopup', async (c) => {
+  if (!isMetered(c.env)) return c.redirect('/dashboard');
   const user = c.get('user');
   const form = await c.req.parseBody();
   if (form.action === 'disable') {
@@ -208,7 +218,7 @@ dashboard.post('/keys', async (c) => {
       `<p class="eyebrow">API key created</p>
 <h1>Copy it now; it won't be shown again.</h1>
 <div class="reveal">${esc(key)}</div>
-<p style="margin-top:1rem"><code>curl https://api.tokenpony.dev/v1/chat/completions -H "Authorization: Bearer ${esc(key)}" …</code></p>
+<p style="margin-top:1rem"><code>curl ${esc(c.env.ISSUER)}/v1/chat/completions -H "Authorization: Bearer ${esc(key)}" …</code></p>
 <p><a class="btn" href="/dashboard">Back to dashboard</a></p>`,
     ),
   );

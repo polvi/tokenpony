@@ -66,16 +66,25 @@ export const MODELS: ModelEntry[] = [
 ];
 
 /**
+ * Namespaces that exist only behind a self-hosted platform's AI binding.
+ * They never appear in a catalog unless MODEL_FILTER opts in, so their
+ * entries can live in MODELS without leaking into the Cloudflare deployment.
+ */
+const PLATFORM_PREFIXES = ['@proc/'];
+
+/**
  * The catalog a deployment actually serves. MODEL_FILTER (comma-separated
  * prefixes of the upstream `cf` id, e.g. "@proc/") narrows the static list
  * to what the AI binding behind this deployment really runs; unset means
- * the full Workers AI list. Everything that lists or accepts a model goes
- * through here, so a filtered-out id is unknown rather than silently
- * served (and priced) as something else.
+ * everything Workers AI serves (platform-only namespaces excluded).
+ * Everything that lists or accepts a model goes through here, so a
+ * filtered-out id is unknown rather than silently served (and priced) as
+ * something else.
  */
 export function catalog(env: { MODEL_FILTER?: string }): ModelEntry[] {
   const prefixes = (env.MODEL_FILTER ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!prefixes.length) return MODELS;
+  if (!prefixes.length)
+    return MODELS.filter((m) => !PLATFORM_PREFIXES.some((p) => m.cf.startsWith(p)));
   return MODELS.filter((m) => prefixes.some((p) => m.cf.startsWith(p)));
 }
 
